@@ -1,6 +1,9 @@
 package com.ive.audiobookplayer
 
 import android.annotation.SuppressLint
+import android.app.Application
+import android.content.ComponentName
+import android.content.Intent
 import android.media.browse.MediaBrowser
 import android.net.Uri
 import android.os.Bundle
@@ -13,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.benchmark.traceprocessor.Row
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,7 +24,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -28,7 +36,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,158 +46,228 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import com.ive.audiobookplayer.ui.theme.AudioBookPlayerTheme
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-class MainActivity : ComponentActivity() {
-    private var player : ExoPlayer? = null
-
+class  MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // init exo
-        player = ExoPlayer.Builder(this).build()
-
-
-
         setContent {
-            var currentTitle by remember { mutableStateOf("No File Selected") }
+            val viewModel: AudioViewModel = viewModel()
 
-            var currentPosition by remember { mutableLongStateOf(0L) }
-            var trackDuration by remember { mutableLongStateOf(0L) }
+            val controller by viewModel.playerController.collectAsState()
 
-            var isPlaying by remember { mutableStateOf(false) }
-
-            val folderPickerLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.OpenDocumentTree()
-            ) { uri: Uri? ->
-                uri?.let { handleFolderSelected(it) }
-            }
-
-            DisposableEffect(Unit) {
-                val listener = object : Player.Listener {
-                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                        currentTitle = mediaItem?.mediaMetadata?.title?.toString()
-                            ?: mediaItem?.requestMetadata?.mediaUri?.lastPathSegment
-                                    ?: "Unknown Track"
-                        trackDuration = player?.duration ?: 0L
-                    }
-
-                    override fun onIsPlayingChanged(isPlayingState: Boolean) {
-                        isPlaying = isPlayingState
-                        if (isPlayingState) {
-                            trackDuration = player?.duration?.coerceAtLeast(0L) ?: 0L
-                        }
-                    }
+            if (controller == null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                    Text("Connecting to Audio Service...")
                 }
-
-                player?.addListener(listener)
-                onDispose { player?.removeListener(listener) }
+            } else {
+                AudioPlayerScreen(
+                    controller = controller!!,
+                    viewModel = viewModel,
+                    onFolderPicked = { uris -> viewModel.playPlaylist(uris) }
+                )
             }
+        }
+    }
+}
 
-            LaunchedEffect(isPlaying) {
-                while (isPlaying) {
-                    currentPosition = player?.currentPosition ?: 0L
-                    delay(1000)
-                }
+
+@Composable
+fun AudioPlayerScreen(
+    controller: MediaController,
+    viewModel: AudioViewModel,
+    onFolderPicked: (List<Uri>) -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // ui states
+    var isPlaying by remember { mutableStateOf(controller.isPlaying) }
+    var currentTitle by remember { mutableStateOf(controller.currentMediaItem?.mediaMetadata?.title?.toString() ?: "No Track Playing") }
+    var currentPosition by remember { mutableLongStateOf(controller.currentPosition) }
+    var duration by remember { mutableLongStateOf(controller.duration.coerceAtLeast(0L)) }
+    var playbackSpeed by remember { mutableFloatStateOf(controller.playbackParameters.speed) }
+
+    LaunchedEffect(isPlaying) {
+        while (isPlaying) {
+            currentPosition = controller.currentPosition
+            duration = controller.duration.coerceAtLeast(0L)
+            delay(500)
+        }
+    }
+
+    // listener for metadata and play/pause changes
+    DisposableEffect(controller) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlayingState: Boolean) {
+                isPlaying = isPlayingState
             }
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                currentTitle = mediaItem?.mediaMetadata?.title?.toString() ?: "Unknown"
+                duration = controller.duration.coerceAtLeast(0L)
+            }
+            override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
+                playbackSpeed = playbackParameters.speed
+            }
+        }
+        controller.addListener(listener)
+        onDispose { controller.removeListener(listener) }
+    }
 
-            Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        uri?.let { treeUri ->
+            context.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val documentFile = DocumentFile.fromTreeUri(context, treeUri)
+            val mp3Uris = documentFile?.listFiles()
+                ?.filter { it.name?.endsWith(".mp3") == true }
+                ?.sortedBy { it.name }
+                ?.map { it.uri } ?: emptyList()
+            onFolderPicked(mp3Uris)
+        }
+    }
+
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(text = "Now Playing", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        Text(text = currentTitle, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, maxLines = 2)
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // seekbar
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Slider(
+                value = currentPosition.toFloat(),
+                valueRange = 0f..(duration.toFloat().coerceAtLeast(1f)),
+                onValueChange = { currentPosition = it.toLong() },
+                onValueChangeFinished = { controller.seekTo(currentPosition) }
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatTime(currentPosition), style = MaterialTheme.typography.bodySmall)
+                Text(formatTime(duration), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        // main controls
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Button(onClick = { controller.seekTo(controller.currentPosition - 15000) }) { Text("-15s") }
+
+            Button(
+                onClick = { if (isPlaying) controller.pause() else controller.play() },
+                modifier = Modifier.size(80.dp),
+                shape = CircleShape
             ) {
-                Button(onClick = { folderPickerLauncher.launch(null) }) {
-                    Text("Select Folder")
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                Text(
-                    text = currentTitle,
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Slider(
-                    value = currentPosition.toFloat(),
-                    valueRange = 0f..(trackDuration.toFloat().coerceAtLeast(1f)),
-                    onValueChange = { newPosition ->
-                        currentPosition = newPosition.toLong()
-                    },
-                    onValueChangeFinished = {
-                        player?.seekTo(currentPosition)
-                    }
-                )
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = formatTime(currentPosition))
-                    Text(text = formatTime(trackDuration))
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Button(onClick = { player?.seekToPrevious() }) {
-                        Text("Prev")
-                    }
-
-                    Button(onClick = {
-                        if (isPlaying) player?.pause() else player?.play()
-                    }) {
-                        Text(if (isPlaying) "Pause" else "Play")
-                    }
-
-                    Button(onClick = { player?.seekToNext() }) {
-                        Text("Next")
-                    }
-                }
+                Text(if (isPlaying) "Pause" else "Play")
             }
+
+            Button(onClick = { controller.seekTo(controller.currentPosition + 15000) }) { Text("+15s") }
         }
 
-       }
-    @SuppressLint("DefaultLocale")
-    private fun formatTime(ms: Long): String {
-        val totalSeconds = ms / 1000
-        val minutes = totalSeconds / 60
-        val seconds = totalSeconds % 60
-        return String.format("%02d:%02d", minutes, seconds)
-    }
-
-
-    private fun handleFolderSelected(uri: Uri){
-        val context = this
-        val documentFile = DocumentFile.fromTreeUri(context, uri)
-
-        val mp3Files = documentFile?.listFiles()
-            ?.filter { it.name?.endsWith(".mp3") == true }
-            ?.sortedBy { it.name }
-            ?:emptyList()
-
-        if(mp3Files.isNotEmpty()){
-            player?.clearMediaItems() // clear current playlist
-
-            mp3Files.forEach { file -> val mediaItem = MediaItem.fromUri(file.uri)
-            player?.addMediaItem(mediaItem)}
+        // prev/next
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Button(onClick = { controller.seekToPrevious() }) { Text("Previous Track") }
+            Button(onClick = { controller.seekToNext() }) { Text("Next Track") }
         }
-        player?.prepare()
-        player?.play()
-        Toast.makeText(this, "Playing ${mp3Files.size} tracks", Toast.LENGTH_SHORT).show()
 
+        // speed slider
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Playback Speed: ${"%.2f".format(playbackSpeed)}x", style = MaterialTheme.typography.bodyMedium)
+            Slider(
+                value = playbackSpeed,
+                valueRange = 0.5f..2.5f,
+                onValueChange = { controller.setPlaybackSpeed(it) }
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Button(onClick = { folderPickerLauncher.launch(null) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Open Folder")
+        }
+
+        Button(
+//            onClick = { viewModel.loadLastSession() },
+            onClick = {},
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+        ) {
+            Text("Resume Last Session")
+        }
+    }
+}
+private fun formatTime(ms: Long): String {
+    val totalSeconds = ms / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format("%02d:%02d", minutes, seconds)
+}
+
+class AudioViewModel(application: Application) : AndroidViewModel(application) {
+
+    private var controllerFuture: ListenableFuture<MediaController>? = null
+
+    private val _playerController = MutableStateFlow<MediaController?>(null)
+    val playerController = _playerController.asStateFlow()
+
+    init {
+        startServiceConnection()
     }
 
+    private fun startServiceConnection() {
+        val context = getApplication<Application>()
 
-    override fun onDestroy() {
-        super.onDestroy()
-        player?.release()
-        player = null
+        val sessionToken = SessionToken(context, ComponentName(context, PlaybackService::class.java))
+
+        controllerFuture = MediaController.Builder(context, sessionToken).buildAsync()
+
+        controllerFuture?.addListener({
+            _playerController.value = controllerFuture?.get()
+        }, MoreExecutors.directExecutor())
+    }
+
+    fun playPlaylist(uris: List<Uri>) {
+        val controller = _playerController.value ?: return
+
+        val mediaItems = uris.map { uri ->
+            val fileName = uri.lastPathSegment ?: "Unknown Track"
+
+            MediaItem.Builder()
+                .setUri(uri)
+                .setMediaMetadata(
+                    androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(fileName)
+                        .build()
+                )
+                .build()
+        }
+
+        controller.setMediaItems(mediaItems)
+        controller.prepare()
+        controller.play()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        controllerFuture?.let {
+            MediaController.releaseFuture(it)
+        }
     }
 }

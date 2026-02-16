@@ -63,6 +63,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 //    val media3Version = "1.9.2" // Use the latest stable version
     implementation(libs.androidx.media3.exoplayer)
+    val lifecycle_version = "2.10.0"
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:${lifecycle_version}")
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.session)
 }
