@@ -71,7 +71,8 @@ fun MainScreen(
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 viewModel.updatePlayerState(
                     currentTitle = mediaItem?.mediaMetadata?.title?.toString() ?: "z1Unknown",
-                    duration = controller.duration.coerceAtLeast(0L)
+                    duration = controller.duration.coerceAtLeast(0L),
+                    currentChapterIndex = controller.currentMediaItemIndex,
                 )
             }
 
@@ -118,6 +119,21 @@ fun MainScreen(
             textAlign = TextAlign.Center,
             maxLines = 2
         )
+
+        if ((playerState.currentAudiobook?.chapters?.size ?: 0) > 1) {
+            Text(
+                text = "Chapter ${playerState.currentChapterIndex + 1} of ${playerState.currentAudiobook?.chapters?.size}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = playerState.currentTitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+        }
 
 
         Box(

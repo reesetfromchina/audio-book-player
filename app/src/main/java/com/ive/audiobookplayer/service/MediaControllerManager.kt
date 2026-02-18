@@ -46,6 +46,8 @@ class MediaControllerManager(private val application: Application) {
     fun playAudiobook(audiobook: Audiobook, bookmark: BookmarkEntry? = null) {
         val controller = _controller.value ?: return
 
+        val wasPlaying = controller.isPlaying
+
         val mediaItems = audiobook.chapters.map { chapter ->
             MediaItem.Builder()
                 .setUri(chapter.uri.toUri())
@@ -63,8 +65,9 @@ class MediaControllerManager(private val application: Application) {
             mediaItems, bookmark?.chapterIndex ?: 0,
             bookmark?.positionMs ?: 0L
         )
+        controller.playWhenReady = wasPlaying
         controller.prepare()
-        controller.play()
+//        controller.play() dont autoplay
     }
 
 

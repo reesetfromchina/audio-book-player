@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
+import com.ive.audiobookplayer.utils.TimeFormatter.formatTime
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 
 @Composable
@@ -132,6 +133,7 @@ fun LibraryScreen(
         }
     }
 }
+
 @Composable
 fun AudiobookCard(
     audiobook: Audiobook,
@@ -177,13 +179,9 @@ fun AudiobookCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (bookmark != null) {
-                    val minutes = (bookmark.positionMs / 1000) / 60
-                    val seconds = (bookmark.positionMs / 1000) % 60
+
                     Text(
-                        "Resume: Ch.${bookmark.chapterIndex + 1} at %02d:%02d".format(
-                            minutes,
-                            seconds
-                        ),
+                        "Resume: Ch.${bookmark.chapterIndex + 1} ${formatTime(bookmark.positionMs)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
