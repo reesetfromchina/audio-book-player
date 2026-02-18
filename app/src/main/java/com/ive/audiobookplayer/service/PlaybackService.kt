@@ -1,8 +1,12 @@
 package com.ive.audiobookplayer.service
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Build
+import android.util.Log
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -23,9 +27,29 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "playback_channel",
+                "Playback",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            getSystemService(NotificationManager::class.java)
+                .createNotificationChannel(channel)
+        }
+
         player = ExoPlayer.Builder(this).build()
 
-        mediaSession = MediaSession.Builder(this, player!!).build()
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        mediaSession = MediaSession.Builder(this, player!!)
+            .setSessionActivity(pendingIntent)
+            .build()
 
         setupNotification()
     }
@@ -33,7 +57,7 @@ class PlaybackService : MediaSessionService() {
     private fun setupNotification() {
         val notificationListener = object : PlayerNotificationManager.NotificationListener {
             override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
-                stopForeground(0)
+                stopForeground(STOP_FOREGROUND_LEGACY)
                 stopSelf()
             }
         }
@@ -45,7 +69,10 @@ class PlaybackService : MediaSessionService() {
         )
             .setMediaDescriptionAdapter(object : PlayerNotificationManager.MediaDescriptionAdapter {
                 override fun createCurrentContentIntent(player: Player): PendingIntent? {
-                    val intent = Intent(this@PlaybackService, MainActivity::class.java)
+                    Log.d("Notification", "createCurrentContentIntent called")
+                    val intent = Intent(this@PlaybackService, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    }
                     return PendingIntent.getActivity(
                         this@PlaybackService,
                         0,

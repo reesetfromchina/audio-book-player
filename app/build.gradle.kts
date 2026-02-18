@@ -60,6 +60,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.documentfile)
 
+    // Navigation
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation(libs.androidx.compose.foundation)
