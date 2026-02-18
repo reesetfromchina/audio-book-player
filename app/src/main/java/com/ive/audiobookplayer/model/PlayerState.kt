@@ -14,6 +14,7 @@ data class PlayerState(
     val currentAudiobook: Audiobook? = null,
     val currentChapterIndex: Int = 0,
     val isScanning: Boolean = false,
+    val isBackgroundScanning: Boolean = false,
 
     val audiobooks: List<Audiobook> = emptyList(),
     val bookmarks: Map<String, BookmarkEntry> = emptyMap(),

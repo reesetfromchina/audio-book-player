@@ -47,7 +47,8 @@ fun LibraryScreen(
     onAudiobookSelected: (Audiobook) -> Unit,
     onPickFolder: () -> Unit,
     isLibraryLoaded: Boolean,
-    isScanning: Boolean
+    isScanning: Boolean,
+    isBackgroundScanning: Boolean
 ) {
     val coverCache by viewModel.coverCache.collectAsState()
 
@@ -56,7 +57,28 @@ fun LibraryScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text("My Library", style = MaterialTheme.typography.headlineMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("My Library", style = MaterialTheme.typography.headlineMedium)
+
+            if (isBackgroundScanning) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp)
+                    Text(
+                        "Updating...",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.height(8.dp))
 
         if (audiobooks.isNotEmpty()) {
@@ -77,6 +99,7 @@ fun LibraryScreen(
                     }
                 }
             }
+
             !isLibraryLoaded || audiobooks.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -88,16 +111,15 @@ fun LibraryScreen(
                     }
                 }
             }
+
             else -> {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(audiobooks, key = {it.id}) { book ->
-
-                        if (!coverCache.containsKey(book.id)){
+                    items(audiobooks, key = { it.id }) { book ->
+                        if (!coverCache.containsKey(book.id)) {
                             LaunchedEffect(book.id) {
                                 viewModel.loadCoverForBook(book)
                             }
                         }
-
                         AudiobookCard(
                             audiobook = book,
                             bookmark = bookmarks[book.id],
@@ -158,7 +180,10 @@ fun AudiobookCard(
                     val minutes = (bookmark.positionMs / 1000) / 60
                     val seconds = (bookmark.positionMs / 1000) % 60
                     Text(
-                        "Resume: Ch.${bookmark.chapterIndex + 1} at %02d:%02d".format(minutes, seconds),
+                        "Resume: Ch.${bookmark.chapterIndex + 1} at %02d:%02d".format(
+                            minutes,
+                            seconds
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )

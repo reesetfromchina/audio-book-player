@@ -58,7 +58,8 @@ class MainActivity : ComponentActivity() {
                     },
                     onPickFolder = { folderPickerLauncher.launch(null) },
                     isLibraryLoaded = playerState.isLibraryLoaded,
-                    isScanning = playerState.isScanning
+                    isScanning = playerState.isScanning,
+                    isBackgroundScanning = playerState.isBackgroundScanning
                 )
             } else {
                 MainScreen(

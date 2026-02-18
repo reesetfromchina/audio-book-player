@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -14,12 +15,14 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 private val Context.bookmarkDataStore by preferencesDataStore(name = "bookmarks")
+
 class BookmarkRepository(private val context: Context) {
 
     private val json = Json { ignoreUnknownKeys = true }
 
     private val LAST_BOOK_ID_KEY = stringPreferencesKey("last_book_id")
     private val ROOT_FOLDER_URI_KEY = stringPreferencesKey("root_folder_uri")
+    private val LIBRARY_CACHE_KEY = stringPreferencesKey("library_cache")
 
     val bookmarks: Flow<Map<String, BookmarkEntry>> =
         context.bookmarkDataStore.data.map { prefs ->
@@ -59,7 +62,10 @@ class BookmarkRepository(private val context: Context) {
 
     suspend fun saveBookmark(entry: BookmarkEntry) {
         val key = stringPreferencesKey("bookmark_${entry.audiobookId}")
-        Log.d("Bookmark", "saveBookmark id=${entry.audiobookId} chapter=${entry.chapterIndex} pos=${entry.positionMs}")
+        Log.d(
+            "Bookmark",
+            "saveBookmark id=${entry.audiobookId} chapter=${entry.chapterIndex} pos=${entry.positionMs}"
+        )
         context.bookmarkDataStore.edit { prefs ->
             prefs[key] = json.encodeToString(entry)
             prefs[LAST_BOOK_ID_KEY] = entry.audiobookId
@@ -80,4 +86,19 @@ class BookmarkRepository(private val context: Context) {
                 runCatching { json.decodeFromString<BookmarkEntry>(it) }.getOrNull()
             }
         }
+
+    suspend fun saveLibraryCache(audiobooks: List<Audiobook>) {
+        context.bookmarkDataStore.edit { prefs ->
+            prefs[LIBRARY_CACHE_KEY] = json.encodeToString(audiobooks)
+        }
+    }
+
+    suspend fun loadLibraryCache(): List<Audiobook> {
+        return runCatching<List<Audiobook>> {
+            val value: String? = context.bookmarkDataStore.data.first()[LIBRARY_CACHE_KEY]
+            value?.let { json.decodeFromString(it) } ?: emptyList()
+        }.getOrDefault(emptyList())
+    }
+
+
 }

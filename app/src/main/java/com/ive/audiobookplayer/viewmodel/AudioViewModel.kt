@@ -57,16 +57,23 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // restore saved library on launch
         viewModelScope.launch {
+            val cached = bookmarkRepository.loadLibraryCache()
+            if (cached.isNotEmpty()) {
+                _playerState.update {
+                    it.copy(audiobooks = cached, isLibraryLoaded = true)
+                }
+            }
+
             bookmarkRepository.rootFolderUri.first()?.let { uriString ->
-                Log.d("Library", "Restoring saved folder: $uriString")
-                val uri = uriString.toUri()
-                scanLibrary(uri)
-            } ?: Log.d("Library", "No saved folder found")
+                val uri = Uri.parse(uriString)
+                if (cached.isEmpty()) {
+                    scanLibrary(uri)
+                } else {
+                    backgroundRescan(uri)
+                }
+            }
         }
-
-
     }
 
     fun loadCoverForBook(audiobook: Audiobook) {
@@ -101,6 +108,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
             bookmarkRepository.saveRootFolderUri(rootUri)
             val audiobooks = audiobookScanner.scanFolder(rootUri)
+            bookmarkRepository.saveLibraryCache(audiobooks)
 
             _playerState.update {
                 it.copy(
@@ -110,6 +118,35 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    private fun backgroundRescan(rootUri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _playerState.update { it.copy(isBackgroundScanning = true) }
+
+            val freshAudiobooks = audiobookScanner.scanFolder(rootUri)
+            val cachedAudiobooks = _playerState.value.audiobooks
+
+            val hasChanges = hasLibraryChanged(cachedAudiobooks, freshAudiobooks)
+            if (hasChanges) {
+                bookmarkRepository.saveLibraryCache(freshAudiobooks)
+                _playerState.update {
+                    it.copy(audiobooks = freshAudiobooks)
+                }
+            }
+
+            _playerState.update { it.copy(isBackgroundScanning = false) }
+        }
+    }
+
+    private fun hasLibraryChanged(
+        cached: List<Audiobook>,
+        fresh: List<Audiobook>
+    ): Boolean {
+        if (cached.size != fresh.size) return true
+        val cachedIds = cached.map { it.id }.toSet()
+        val freshIds = fresh.map { it.id }.toSet()
+        return cachedIds != freshIds
     }
 
     @OptIn(UnstableApi::class)
@@ -209,7 +246,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             coverArtRepository.saveCoverUri(audiobook.id, uri)
             refreshCoverForBook(audiobook)
 
-            viewModelScope.launch(Dispatchers.IO){
+            viewModelScope.launch(Dispatchers.IO) {
                 val bitmap = decodeBitmapFromUri(uri, targetSize = 512)
                 _playerState.update { it.copy(currentCoverBitmap = bitmap) }
             }
