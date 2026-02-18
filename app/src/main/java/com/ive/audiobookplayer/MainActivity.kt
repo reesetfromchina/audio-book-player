@@ -1,25 +1,72 @@
 package com.ive.audiobookplayer
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ive.audiobookplayer.ui.screens.LibraryScreen
 import com.ive.audiobookplayer.ui.screens.MainScreen
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 
 
 class MainActivity : ComponentActivity() {
+    private val imagePicker = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            contentResolver.takePersistableUriPermission(
+                it, Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            viewModel.setCustomCover(it)
+        }
+    }
+    private val viewModel: AudioViewModel by viewModels()
+    private val folderPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let {
+            contentResolver.takePersistableUriPermission(
+                it, Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            viewModel.scanLibrary(it)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            val viewModel: AudioViewModel = viewModel()
+            val playerState by viewModel.playerState.collectAsState()
+            var showLibrary by remember { mutableStateOf(true) }
 
-            MainScreen(
-                viewModel = viewModel,
-                onFolderPicked = { uris -> viewModel.playPlaylist(uris) })
+            if (showLibrary) {
+                LibraryScreen(
+                    viewModel = viewModel,
+                    audiobooks = playerState.audiobooks,
+                    bookmarks = playerState.bookmarks,
+                    onAudiobookSelected = { book ->
+                        viewModel.playAudiobook(book)
+                        showLibrary = false
+                    },
+                    onPickFolder = { folderPickerLauncher.launch(null) },
+                    isLibraryLoaded = playerState.isLibraryLoaded,
+                    isScanning = playerState.isScanning
+                )
+            } else {
+                MainScreen(
+                    viewModel = viewModel,
+                    onBackToLibrary = { showLibrary = true },
+                    onPickCover = { imagePicker.launch(arrayOf("image/*")) }
+                )
+            }
         }
     }
 }
-
-

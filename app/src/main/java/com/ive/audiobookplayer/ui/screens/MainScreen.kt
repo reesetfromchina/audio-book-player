@@ -1,16 +1,25 @@
 package com.ive.audiobookplayer.ui.screens
 
-import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,12 +29,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import com.ive.audiobookplayer.ui.componenets.FolderPickerButton
 import com.ive.audiobookplayer.ui.componenets.PlaybackSpeedControl
 import com.ive.audiobookplayer.ui.componenets.PlayerControls
 import com.ive.audiobookplayer.ui.componenets.SeekBarControl
@@ -35,7 +46,8 @@ import kotlinx.coroutines.delay
 @Composable
 fun MainScreen(
     viewModel: AudioViewModel,
-    onFolderPicked: (List<Uri>) -> Unit
+    onBackToLibrary: () -> Unit,
+    onPickCover: () -> Unit
 ) {
     val playerState by viewModel.playerState.collectAsState()
     val controller = playerState.controller
@@ -43,10 +55,10 @@ fun MainScreen(
     if (controller == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
-            Text("Connecting to Audio service...")
         }
         return
     }
+
 
     // attach player listener
     DisposableEffect(controller) {
@@ -66,6 +78,15 @@ fun MainScreen(
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
                 viewModel.updatePlayerState(playbackSpeed = playbackParameters.speed)
             }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    viewModel.updatePlayerState(
+                        duration = controller.duration.coerceAtLeast(0L)
+                    )
+                }
+            }
+
         }
         controller.addListener(listener)
         onDispose { controller.removeListener(listener) }
@@ -78,7 +99,6 @@ fun MainScreen(
         }
     }
 
-    // UI
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -93,11 +113,61 @@ fun MainScreen(
         )
 
         Text(
-            text = playerState.currentTitle,
+            text = playerState.currentBookTitle.ifEmpty { playerState.currentTitle },
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
             maxLines = 2
         )
+
+
+        Box(
+            modifier = Modifier
+                .size(240.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(enabled = playerState.currentAudiobook != null) { onPickCover() },
+            contentAlignment = Alignment.Center
+        ) {
+            if (playerState.currentCoverBitmap != null) {
+                Image(
+                    bitmap = playerState.currentCoverBitmap!!.asImageBitmap(),
+                    contentDescription = "Cover art",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Change cover",
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.Done,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Tap to add cover",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.weight(1f))
 
@@ -120,14 +190,12 @@ fun MainScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        FolderPickerButton(onFolderSelected = onFolderPicked)
-
         Button(
-            onClick = { /* TODO: Implement last session */ },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+            onClick = onBackToLibrary,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Resume Last Session")
+            Text("Back to Library")
         }
+
     }
 }
