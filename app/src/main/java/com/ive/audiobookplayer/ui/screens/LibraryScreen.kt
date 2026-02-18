@@ -23,7 +23,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButtonDefaults.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -91,10 +90,14 @@ fun LibraryScreen(
             }
             else -> {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(audiobooks) { book ->
-                        LaunchedEffect(book.id) {
-                            viewModel.loadCoverForBook(book)
+                    items(audiobooks, key = {it.id}) { book ->
+
+                        if (!coverCache.containsKey(book.id)){
+                            LaunchedEffect(book.id) {
+                                viewModel.loadCoverForBook(book)
+                            }
                         }
+
                         AudiobookCard(
                             audiobook = book,
                             bookmark = bookmarks[book.id],

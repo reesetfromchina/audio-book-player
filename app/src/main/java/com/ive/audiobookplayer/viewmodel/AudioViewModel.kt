@@ -41,6 +41,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private val _coverCache = MutableStateFlow<Map<String, Bitmap>>(emptyMap())
     val coverCache: StateFlow<Map<String, Bitmap>> = _coverCache.asStateFlow()
 
+    private val coverLoadAttempted = mutableSetOf<String>()
     private var bookmarkSaveJob: Job? = null
 
     init {
@@ -67,19 +68,31 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
 
     }
+
     fun loadCoverForBook(audiobook: Audiobook) {
-        if (_coverCache.value.containsKey(audiobook.id)) return
+        if (coverLoadAttempted.contains(audiobook.id)) return
+        coverLoadAttempted.add(audiobook.id)
         viewModelScope.launch(Dispatchers.IO) {
             val userCover = coverArtRepository.getCoverUri(audiobook.id)
             val bitmap = if (userCover != null) {
-                decodeBitmapFromUri(userCover.toUri())
+                decodeBitmapFromUri(Uri.parse(userCover), targetSize = 128)
             } else {
-                coverArtExtractor.extractCover(audiobook.chapters.first().uri.toUri())
+                coverArtExtractor.extractCover(
+                    Uri.parse(audiobook.chapters.first().uri),
+                    targetSize = 128
+                )
             }
             if (bitmap != null) {
                 _coverCache.update { it + (audiobook.id to bitmap) }
             }
         }
+    }
+
+    // called when when user sets a custom cover so it reloads for that specific book
+    fun refreshCoverForBook(audiobook: Audiobook) {
+        coverLoadAttempted.remove(audiobook.id)
+        _coverCache.update { it - audiobook.id }
+        loadCoverForBook(audiobook)
     }
 
     fun scanLibrary(rootUri: Uri) {
@@ -104,7 +117,10 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             saveCurrentPosition()
             val bookmark = bookmarkRepository.getBookmark(audiobook.id)
-            Log.d("Bookmark", "playAudiobook title=${audiobook.title} id=${audiobook.id} bookmark=$bookmark")
+            Log.d(
+                "Bookmark",
+                "playAudiobook title=${audiobook.title} id=${audiobook.id} bookmark=$bookmark"
+            )
             controllerManager.playAudiobook(audiobook, bookmark)
 
             _playerState.update {
@@ -127,32 +143,59 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             // check user-imported cover first — decode as plain image
             val userCoverUri = coverArtRepository.getCoverUri(audiobook.id)
+
             if (userCoverUri != null) {
-                val bitmap = decodeBitmapFromUri(userCoverUri.toUri())
+                // larger size for the player screen
+                val bitmap = decodeBitmapFromUri(Uri.parse(userCoverUri), targetSize = 512)
                 _playerState.update { it.copy(currentCoverBitmap = bitmap) }
-                _coverCache.update { it + (audiobook.id to (bitmap ?: return@launch)) }
+
+                // smaller thumbnail for library cache
+                val thumb = decodeBitmapFromUri(Uri.parse(userCoverUri), targetSize = 128)
+                if (thumb != null) {
+                    _coverCache.update { it + (audiobook.id to thumb) }
+                }
                 return@launch
             }
 
             // try embedded art from audio file
             val firstChapterUri = audiobook.chapters.firstOrNull()?.uri ?: return@launch
-            val bitmap = coverArtExtractor.extractCover(firstChapterUri.toUri())
+            val bitmap =
+                coverArtExtractor.extractCover(Uri.parse(firstChapterUri), targetSize = 512)
             _playerState.update { it.copy(currentCoverBitmap = bitmap) }
-            if (bitmap != null) {
-                _coverCache.update { it + (audiobook.id to bitmap) }
+            val thumb = coverArtExtractor.extractCover(Uri.parse(firstChapterUri), targetSize = 128)
+            if (thumb != null) {
+                _coverCache.update { it + (audiobook.id to thumb) }
             }
         }
     }
 
-    private fun decodeBitmapFromUri(uri: Uri): Bitmap? {
+    private fun decodeBitmapFromUri(uri: Uri, targetSize: Int = 128): Bitmap? {
         return try {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+
             getApplication<Application>().contentResolver.openInputStream(uri)?.use { stream ->
-                BitmapFactory.decodeStream(stream)
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+
+            options.inSampleSize =
+                calculateSampleSize(options.outWidth, options.outHeight, targetSize)
+            options.inJustDecodeBounds = false
+
+            getApplication<Application>().contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
             }
         } catch (e: Exception) {
             Log.e("Cover", "Failed to decode image: ${e.message}")
             null
         }
+    }
+
+    private fun calculateSampleSize(width: Int, height: Int, targetSize: Int): Int {
+        var sampleSize = 1
+        while (width / sampleSize > targetSize || height / sampleSize > targetSize) {
+            sampleSize *= 2
+        }
+        return sampleSize
     }
 
     // called when user picks an image for the current book
@@ -164,7 +207,12 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         Log.d("Cover", "Setting cover for ${audiobook.title}, uri=$uri")
         viewModelScope.launch {
             coverArtRepository.saveCoverUri(audiobook.id, uri)
-            loadCoverArt(audiobook)
+            refreshCoverForBook(audiobook)
+
+            viewModelScope.launch(Dispatchers.IO){
+                val bitmap = decodeBitmapFromUri(uri, targetSize = 512)
+                _playerState.update { it.copy(currentCoverBitmap = bitmap) }
+            }
         }
     }
 
