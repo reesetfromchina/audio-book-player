@@ -105,25 +105,21 @@ fun MainScreen(
             .fillMaxSize()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "Now playing",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-
+        Spacer(Modifier.height(12.dp))
         Text(
             text = playerState.currentBookTitle.ifEmpty { playerState.currentTitle },
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
-            maxLines = 2
+            maxLines = 2,
+
         )
 
         if ((playerState.currentAudiobook?.chapters?.size ?: 0) > 1) {
             Text(
                 text = "Chapter ${playerState.currentChapterIndex + 1} of ${playerState.currentAudiobook?.chapters?.size}",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
