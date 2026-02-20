@@ -19,8 +19,7 @@ fun PlaybackSpeedControl(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 4.dp)
     ) {
         Text("Playback Speed: ${"%.2f".format(currentSpeed)}x")
         Slider(

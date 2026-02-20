@@ -19,5 +19,6 @@ data class PlayerState(
     val audiobooks: List<Audiobook> = emptyList(),
     val bookmarks: Map<String, BookmarkEntry> = emptyMap(),
     val isLibraryLoaded: Boolean = false,
-    val currentCoverBitmap: Bitmap? = null
+    val currentCoverBitmap: Bitmap? = null,
+    val showChapterList: Boolean = false
 )

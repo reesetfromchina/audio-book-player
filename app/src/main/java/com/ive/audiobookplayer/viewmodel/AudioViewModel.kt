@@ -79,15 +79,27 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     fun loadCoverForBook(audiobook: Audiobook) {
         if (coverLoadAttempted.contains(audiobook.id)) return
         coverLoadAttempted.add(audiobook.id)
+
         viewModelScope.launch(Dispatchers.IO) {
-            val userCover = coverArtRepository.getCoverUri(audiobook.id)
-            val bitmap = if (userCover != null) {
-                decodeBitmapFromUri(userCover.toUri(), targetSize = 128)
-            } else {
-                coverArtExtractor.extractCover(
-                    audiobook.chapters.first().uri.toUri(),
-                    targetSize = 128
-                )
+
+            val bitmap = when {
+                coverArtRepository.getCoverUri(audiobook.id) != null -> {
+                    decodeBitmapFromUri(
+                        Uri.parse(coverArtRepository.getCoverUri(audiobook.id)),
+                        targetSize = 128
+                    )
+                }
+
+                audiobook.coverUri != null -> {
+                    decodeBitmapFromUri(Uri.parse(audiobook.coverUri), targetSize = 128)
+                }
+
+                else -> {
+                    coverArtExtractor.extractCover(
+                        Uri.parse(audiobook.chapters.first().uri),
+                        targetSize = 128
+                    )
+                }
             }
             if (bitmap != null) {
                 _coverCache.update { it + (audiobook.id to bitmap) }
@@ -187,31 +199,26 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadCoverArt(audiobook: Audiobook) {
         viewModelScope.launch(Dispatchers.IO) {
-            // check user-imported cover first — decode as plain image
-            val userCoverUri = coverArtRepository.getCoverUri(audiobook.id)
-
-            if (userCoverUri != null) {
-                // larger size for the player screen
-                val bitmap = decodeBitmapFromUri(userCoverUri.toUri(), targetSize = 512)
-                _playerState.update { it.copy(currentCoverBitmap = bitmap) }
-
-                // smaller thumbnail for library cache
-                val thumb = decodeBitmapFromUri(userCoverUri.toUri(), targetSize = 128)
-                if (thumb != null) {
-                    _coverCache.update { it + (audiobook.id to thumb) }
+            val bitmap = when {
+                // user manually imported cover
+                coverArtRepository.getCoverUri(audiobook.id) != null -> {
+                    decodeBitmapFromUri(
+                        Uri.parse(coverArtRepository.getCoverUri(audiobook.id)),
+                        targetSize = 512
+                    )
                 }
-                return@launch
+                // 2 image file found in audiobook folder
+                audiobook.coverUri != null -> {
+                    decodeBitmapFromUri(Uri.parse(audiobook.coverUri), targetSize = 512)
+                }
+                // embedded metadata
+                else -> {
+                    coverArtExtractor.extractCover(
+                        Uri.parse(audiobook.chapters.first().uri), targetSize = 512
+                    )
+                }
             }
-
-            // try embedded art from audio file
-            val firstChapterUri = audiobook.chapters.firstOrNull()?.uri ?: return@launch
-            val bitmap =
-                coverArtExtractor.extractCover(firstChapterUri.toUri(), targetSize = 512)
             _playerState.update { it.copy(currentCoverBitmap = bitmap) }
-            val thumb = coverArtExtractor.extractCover(firstChapterUri.toUri(), targetSize = 128)
-            if (thumb != null) {
-                _coverCache.update { it + (audiobook.id to thumb) }
-            }
         }
     }
 
@@ -329,17 +336,36 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    fun updateCurrentChapterDuration(durationMs: Long){
+    fun updateCurrentChapterDuration(durationMs: Long) {
         val state = _playerState.value
         val audiobook = state.currentAudiobook ?: return
         val chapterIndex = state.controller?.currentMediaItemIndex ?: return
 
         val updatedChapters = audiobook.chapters.toMutableList()
 
-        if (chapterIndex < updatedChapters.size){
-            updatedChapters[chapterIndex] = updatedChapters[chapterIndex].copy(durationMs = durationMs)
+        if (chapterIndex < updatedChapters.size) {
+            updatedChapters[chapterIndex] =
+                updatedChapters[chapterIndex].copy(durationMs = durationMs)
             val updatedBook = audiobook.copy(chapters = updatedChapters)
             _playerState.update { it.copy(currentAudiobook = updatedBook) }
+        }
+    }
+
+    fun toggleChapterList() {
+        _playerState.update { it.copy(showChapterList = !it.showChapterList) }
+    }
+
+    fun jumpToChapter(index: Int) {
+        val controller = _playerState.value.controller ?: return
+        viewModelScope.launch {
+            saveCurrentPosition()
+            controller.seekTo(index, 0)
+            _playerState.update {
+                it.copy(
+                    showChapterList = false,
+                    currentChapterIndex = index
+                )
+            }
         }
     }
 

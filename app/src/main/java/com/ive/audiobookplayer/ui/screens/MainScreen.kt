@@ -12,15 +12,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -103,12 +107,23 @@ fun MainScreen(
         }
     }
 
+    if (playerState.showChapterList && playerState.currentAudiobook != null) {
+        ChapterListSheet(
+            audiobook = playerState.currentAudiobook!!,
+            currentChapterIndex = playerState.currentChapterIndex,
+            bookmarks = playerState.bookmarks,
+            onChapterSelected = { viewModel.jumpToChapter(it) },
+            onDismiss = { viewModel.toggleChapterList() }
+        )
+    }
+
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Spacer(Modifier.height(12.dp))
         Text(
@@ -137,7 +152,7 @@ fun MainScreen(
 
         Box(
             modifier = Modifier
-                .size(240.dp)
+                .size(220.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .clickable(enabled = playerState.currentAudiobook != null) { onPickCover() },
@@ -203,6 +218,21 @@ fun MainScreen(
             currentSpeed = playerState.playbackSpeed
         )
 
+        Spacer(modifier = Modifier.weight(1f))
+
+        if ((playerState.currentAudiobook?.chapters?.size ?: 0) > 1) {
+            OutlinedButton(
+                onClick = { viewModel.toggleChapterList() },
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.List,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Chapters (${playerState.currentAudiobook?.chapters?.size})")
+            }
+        }
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
