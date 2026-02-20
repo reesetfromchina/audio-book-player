@@ -23,7 +23,7 @@ class BookmarkRepository(private val context: Context) {
     private val LAST_BOOK_ID_KEY = stringPreferencesKey("last_book_id")
     private val ROOT_FOLDER_URI_KEY = stringPreferencesKey("root_folder_uri")
     private val LIBRARY_CACHE_KEY = stringPreferencesKey("library_cache")
-
+    private val SPEED_KEY_PREFIX = "speed_"
     val bookmarks: Flow<Map<String, BookmarkEntry>> =
         context.bookmarkDataStore.data.map { prefs ->
             prefs.asMap()
@@ -37,9 +37,6 @@ class BookmarkRepository(private val context: Context) {
                 .toMap()
         }
 
-    val lastBookId: Flow<String?> = context.bookmarkDataStore.data.map { prefs ->
-        prefs[LAST_BOOK_ID_KEY]
-    }
 
     val rootFolderUri: Flow<String?> = context.bookmarkDataStore.data.map { prefs ->
         prefs[ROOT_FOLDER_URI_KEY]
@@ -72,21 +69,6 @@ class BookmarkRepository(private val context: Context) {
         }
     }
 
-    suspend fun clearRootFolderUri() {
-        context.bookmarkDataStore.edit { prefs ->
-            prefs.remove(ROOT_FOLDER_URI_KEY)
-        }
-    }
-
-
-    fun getBookmarkFlow(audiobookId: String): Flow<BookmarkEntry?> =
-        context.bookmarkDataStore.data.map { prefs ->
-            val key = stringPreferencesKey("bookmark_$audiobookId")
-            prefs[key]?.let {
-                runCatching { json.decodeFromString<BookmarkEntry>(it) }.getOrNull()
-            }
-        }
-
     suspend fun saveLibraryCache(audiobooks: List<Audiobook>) {
         context.bookmarkDataStore.edit { prefs ->
             prefs[LIBRARY_CACHE_KEY] = json.encodeToString(audiobooks)
@@ -98,6 +80,18 @@ class BookmarkRepository(private val context: Context) {
             val value: String? = context.bookmarkDataStore.data.first()[LIBRARY_CACHE_KEY]
             value?.let { json.decodeFromString(it) } ?: emptyList()
         }.getOrDefault(emptyList())
+    }
+
+    suspend fun saveSpeed(audiobookId: String, speed: Float) {
+        val key = stringPreferencesKey("$SPEED_KEY_PREFIX${audiobookId.hashCode()}")
+        context.bookmarkDataStore.edit { prefs ->
+            prefs[key] = speed.toString()
+        }
+    }
+
+    suspend fun getSpeed(audiobookId: String): Float {
+        val key = stringPreferencesKey("$SPEED_KEY_PREFIX${audiobookId.hashCode()}")
+        return context.bookmarkDataStore.data.first()[key]?.toFloat() ?: 1f
     }
 
 

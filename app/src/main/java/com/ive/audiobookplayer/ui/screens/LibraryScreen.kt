@@ -22,22 +22,23 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
-import com.ive.audiobookplayer.utils.TimeFormatter.formatTime
+import com.ive.audiobookplayer.utils.calculateProgress
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 
 @Composable
@@ -141,13 +142,17 @@ fun AudiobookCard(
     coverBitmap: Bitmap? = null,
     onClick: () -> Unit
 ) {
+    val progress = remember(bookmark) {
+        calculateProgress(audiobook, bookmark)
+    }
+
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // thumbnail
+            // Thumbnail
             Box(
                 modifier = Modifier
                     .size(64.dp)
@@ -178,13 +183,37 @@ fun AudiobookCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (bookmark != null) {
 
-                    Text(
-                        "Resume: Ch.${bookmark.chapterIndex + 1} ${formatTime(bookmark.positionMs)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
+                if (bookmark != null) {
+                    Spacer(Modifier.height(4.dp))
+
+                    LinearProgressIndicator(
+                        progress = { (progress / 100f).coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
                     )
+
+                    Spacer(Modifier.height(2.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val minutes = (bookmark.positionMs / 1000) / 60
+                        val seconds = (bookmark.positionMs / 1000) % 60
+                        Text(
+                            "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(minutes, seconds),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "%.0f%%".format(progress),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }

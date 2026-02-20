@@ -85,6 +85,9 @@ fun MainScreen(
                     viewModel.updatePlayerState(
                         duration = controller.duration.coerceAtLeast(0L)
                     )
+
+                    // update current chapter duration
+                    viewModel.updateCurrentChapterDuration(controller.duration.coerceAtLeast(0L))
                 }
             }
 
