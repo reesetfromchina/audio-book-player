@@ -20,5 +20,6 @@ data class PlayerState(
     val bookmarks: Map<String, BookmarkEntry> = emptyMap(),
     val isLibraryLoaded: Boolean = false,
     val currentCoverBitmap: Bitmap? = null,
-    val showChapterList: Boolean = false
+    val showChapterList: Boolean = false,
+    val libraryGroups: LibraryGroups = LibraryGroups(),
 )

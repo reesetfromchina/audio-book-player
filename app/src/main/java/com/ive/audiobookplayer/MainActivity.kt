@@ -91,7 +91,8 @@ class MainActivity : ComponentActivity() {
                                 onPickFolder = { folderPickerLauncher.launch(null) },
                                 isLibraryLoaded = playerState.isLibraryLoaded,
                                 isScanning = playerState.isScanning,
-                                isBackgroundScanning = playerState.isBackgroundScanning
+                                isBackgroundScanning = playerState.isBackgroundScanning,
+                                libraryGroups = playerState.libraryGroups
                             )
                         }
                         composable("player") {

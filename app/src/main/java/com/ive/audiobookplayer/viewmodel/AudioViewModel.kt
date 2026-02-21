@@ -27,6 +27,8 @@ import kotlinx.coroutines.launch
 import com.ive.audiobookplayer.repository.CoverArtRepository
 import com.ive.audiobookplayer.utils.CoverArtExtractor
 import androidx.core.net.toUri
+import com.ive.audiobookplayer.model.LibraryGroups
+import com.ive.audiobookplayer.utils.calculateProgress
 
 class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -54,6 +56,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             bookmarkRepository.bookmarks.collect { bookmarks ->
                 _playerState.update { it.copy(bookmarks = bookmarks) }
+                updateLibraryGroups()
             }
         }
 
@@ -129,6 +132,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                     isScanning = false
                 )
             }
+            updateLibraryGroups()
         }
     }
 
@@ -148,6 +152,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             _playerState.update { it.copy(isBackgroundScanning = false) }
+            updateLibraryGroups()
         }
     }
 
@@ -366,6 +371,41 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                     currentChapterIndex = index
                 )
             }
+        }
+    }
+
+    private fun updateLibraryGroups() {
+        val audiobooks = _playerState.value.audiobooks
+        val bookmarks = _playerState.value.bookmarks
+
+        val inProgress = mutableListOf<Audiobook>()
+        val unplayed = mutableListOf<Audiobook>()
+        val finished = mutableListOf<Audiobook>()
+
+        audiobooks.forEach { book ->
+            val bookmark = bookmarks[book.id]
+            val progress = calculateProgress(book, bookmark)
+
+            when {
+                bookmark == null -> unplayed.add(book)
+                progress >= 95f -> finished.add(book)
+                else -> inProgress.add(book)
+            }
+        }
+        // sort in progress by recently played
+        inProgress.sortByDescending { bookmarks[it.id]?.lastPlayedAt ?: 0L }
+
+        // unplayed alph
+        unplayed.sortBy { it.title }
+
+        _playerState.update {
+            it.copy(
+                libraryGroups = LibraryGroups(
+                    inProgress,
+                    unplayed,
+                    finished
+                )
+            )
         }
     }
 

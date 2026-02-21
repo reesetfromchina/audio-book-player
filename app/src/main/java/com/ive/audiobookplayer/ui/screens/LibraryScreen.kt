@@ -17,10 +17,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -33,11 +36,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
+import com.ive.audiobookplayer.model.LibraryGroups
 import com.ive.audiobookplayer.utils.calculateProgress
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 
@@ -50,7 +56,8 @@ fun LibraryScreen(
     onPickFolder: () -> Unit,
     isLibraryLoaded: Boolean,
     isScanning: Boolean,
-    isBackgroundScanning: Boolean
+    isBackgroundScanning: Boolean,
+    libraryGroups: LibraryGroups
 ) {
     val coverCache by viewModel.coverCache.collectAsState()
 
@@ -65,7 +72,6 @@ fun LibraryScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("My Library", style = MaterialTheme.typography.headlineMedium)
-
             if (isBackgroundScanning) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -101,7 +107,6 @@ fun LibraryScreen(
                     }
                 }
             }
-
             !isLibraryLoaded || audiobooks.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -113,21 +118,68 @@ fun LibraryScreen(
                     }
                 }
             }
-
             else -> {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(audiobooks, key = { it.id }) { book ->
-                        if (!coverCache.containsKey(book.id)) {
-                            LaunchedEffect(book.id) {
-                                viewModel.loadCoverForBook(book)
-                            }
+                    if (libraryGroups.inProgress.isNotEmpty()) {
+                        item {
+                            LibrarySectionHeader(
+                                title = "In Progress",
+                                count = libraryGroups.inProgress.size
+                            )
                         }
-                        AudiobookCard(
-                            audiobook = book,
-                            bookmark = bookmarks[book.id],
-                            coverBitmap = coverCache[book.id],
-                            onClick = { onAudiobookSelected(book) }
-                        )
+                        items(libraryGroups.inProgress, key = { it.id }) { book ->
+                            if (!coverCache.containsKey(book.id)) {
+                                LaunchedEffect(book.id) { viewModel.loadCoverForBook(book) }
+                            }
+                            AudiobookCard(
+                                audiobook = book,
+                                bookmark = bookmarks[book.id],
+                                coverBitmap = coverCache[book.id],
+                                onClick = { onAudiobookSelected(book) }
+                            )
+                        }
+                        item { Spacer(Modifier.height(8.dp)) }
+                    }
+                    if (libraryGroups.unplayed.isNotEmpty()) {
+                        item {
+                            LibrarySectionHeader(
+                                title = "Unplayed",
+                                count = libraryGroups.unplayed.size
+                            )
+                        }
+                        items(libraryGroups.unplayed, key = { it.id }) { book ->
+                            if (!coverCache.containsKey(book.id)) {
+                                LaunchedEffect(book.id) { viewModel.loadCoverForBook(book) }
+                            }
+                            AudiobookCard(
+                                audiobook = book,
+                                bookmark = bookmarks[book.id],
+                                coverBitmap = coverCache[book.id],
+                                onClick = { onAudiobookSelected(book) }
+                            )
+                        }
+                        item { Spacer(Modifier.height(8.dp)) }
+                    }
+
+                    if (libraryGroups.finished.isNotEmpty()) {
+                        item {
+                            LibrarySectionHeader(
+                                title = "Finished",
+                                count = libraryGroups.finished.size
+                            )
+                        }
+                        items(libraryGroups.finished, key = { it.id }) { book ->
+                            if (!coverCache.containsKey(book.id)) {
+                                LaunchedEffect(book.id) { viewModel.loadCoverForBook(book) }
+                            }
+                            AudiobookCard(
+                                audiobook = book,
+                                bookmark = bookmarks[book.id],
+                                coverBitmap = coverCache[book.id],
+                                isFinished = true,
+                                onClick = { onAudiobookSelected(book) }
+                            )
+                        }
                     }
                 }
             }
@@ -136,23 +188,55 @@ fun LibraryScreen(
 }
 
 @Composable
+fun LibrarySectionHeader(title: String, count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    HorizontalDivider()
+    Spacer(Modifier.height(4.dp))
+}
+
+@Composable
 fun AudiobookCard(
     audiobook: Audiobook,
     bookmark: BookmarkEntry?,
     coverBitmap: Bitmap? = null,
+    isFinished: Boolean = false,
     onClick: () -> Unit
 ) {
-    val progress = remember(bookmark) {
-        calculateProgress(audiobook, bookmark)
-    }
+    val progress = remember(bookmark) { calculateProgress(audiobook, bookmark) }
 
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isFinished)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            else
+                MaterialTheme.colorScheme.surface
+        )
+    ) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Thumbnail
             Box(
                 modifier = Modifier
                     .size(64.dp)
@@ -169,15 +253,37 @@ fun AudiobookCard(
                     )
                 } else {
                     Icon(
-                        Icons.Default.Star,
+                        Icons.Default.MusicNote,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                if (isFinished) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.4f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Finished",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
             }
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(audiobook.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    audiobook.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (isFinished)
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    else
+                        MaterialTheme.colorScheme.onSurface
+                )
                 Text(
                     "${audiobook.chapters.size} chapter(s)",
                     style = MaterialTheme.typography.bodySmall,
@@ -186,17 +292,18 @@ fun AudiobookCard(
 
                 if (bookmark != null) {
                     Spacer(Modifier.height(4.dp))
-
                     LinearProgressIndicator(
                         progress = { (progress / 100f).coerceIn(0f, 1f) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(4.dp)
                             .clip(RoundedCornerShape(2.dp)),
+                        color = if (isFinished)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        else
+                            MaterialTheme.colorScheme.primary
                     )
-
                     Spacer(Modifier.height(2.dp))
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -204,14 +311,18 @@ fun AudiobookCard(
                         val minutes = (bookmark.positionMs / 1000) / 60
                         val seconds = (bookmark.positionMs / 1000) % 60
                         Text(
-                            "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(minutes, seconds),
+                            if (isFinished) "Finished"
+                            else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(minutes, seconds),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             "%.0f%%".format(progress),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
+                            color = if (isFinished)
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else
+                                MaterialTheme.colorScheme.primary
                         )
                     }
                 }
