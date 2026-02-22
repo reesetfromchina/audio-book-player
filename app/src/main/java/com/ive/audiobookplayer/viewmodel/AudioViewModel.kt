@@ -46,6 +46,8 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private val coverLoadAttempted = mutableSetOf<String>()
     private var bookmarkSaveJob: Job? = null
 
+    private var sleepTimerJob: Job? = null
+
     init {
         viewModelScope.launch {
             controllerManager.controller.collect { controller ->
@@ -407,6 +409,47 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 )
             )
         }
+    }
+
+    fun setSleepTimer(minutes: Int?) {
+        sleepTimerJob?.cancel()
+
+        if (minutes == null) {
+            //cancel timer
+            _playerState.update { it.copy(sleepTimerEndTime = 0L, sleepTimerLabel = "") }
+            return
+        }
+
+        val endTime = System.currentTimeMillis() + (minutes * 60 * 1000L)
+        _playerState.update { it.copy(sleepTimerEndTime = endTime) }
+
+        sleepTimerJob = viewModelScope.launch {
+            while (true) {
+                val remaining = endTime - System.currentTimeMillis()
+                if (remaining <= 0) {
+                    // timer expired - pause
+                    _playerState.value.controller?.pause()
+                    _playerState.update { it.copy(sleepTimerEndTime = 0L, sleepTimerLabel = "") }
+                    break
+                }
+                val minutes = (remaining / 1000) / 60
+                val seconds = (remaining / 1000) % 60
+                _playerState.update {
+                    it.copy(
+                        sleepTimerLabel = "%02d:%02d".format(
+                            minutes,
+                            seconds
+                        )
+                    )
+                }
+                delay(1000)
+            }
+        }
+    }
+
+    fun setSleepTimerEndOfChapter(){
+        sleepTimerJob?.cancel()
+        _playerState.update { it.copy(sleepTimerEndTime = -1L, sleepTimerLabel = "End of chapter") }
     }
 
 

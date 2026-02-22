@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -19,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -31,6 +33,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +49,7 @@ import androidx.media3.common.Player
 import com.ive.audiobookplayer.ui.componenets.PlaybackSpeedControl
 import com.ive.audiobookplayer.ui.componenets.PlayerControls
 import com.ive.audiobookplayer.ui.componenets.SeekBarControl
+import com.ive.audiobookplayer.ui.componenets.SleepTimerDialog
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 import kotlinx.coroutines.delay
 
@@ -55,6 +61,7 @@ fun MainScreen(
 ) {
     val playerState by viewModel.playerState.collectAsState()
     val controller = playerState.controller
+    var showSleepTimerDialog by remember { mutableStateOf(false) }
 
     if (controller == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -78,6 +85,11 @@ fun MainScreen(
                     duration = controller.duration.coerceAtLeast(0L),
                     currentChapterIndex = controller.currentMediaItemIndex,
                 )
+
+                if (playerState.sleepTimerEndTime == -1L){
+                    controller.pause()
+                    viewModel.setSleepTimer(null)
+                }
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
@@ -121,11 +133,11 @@ fun MainScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(WindowInsets.safeDrawing.asPaddingValues())
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Spacer(Modifier.height(12.dp))
         Text(
             text = playerState.currentBookTitle.ifEmpty { playerState.currentTitle },
             style = MaterialTheme.typography.headlineSmall,
@@ -212,10 +224,20 @@ fun MainScreen(
             controller = controller,
             isPlaying = playerState.isPlaying,
         )
+        if (showSleepTimerDialog) {
+            SleepTimerDialog(
+                currentLabel = playerState.sleepTimerLabel,
+                onDismiss = { showSleepTimerDialog = false },
+                onTimerSelected = { viewModel.setSleepTimer(it) },
+                onEndChapter = { viewModel.setSleepTimerEndOfChapter() }
+            )
+        }
 
         PlaybackSpeedControl(
             controller = controller,
-            currentSpeed = playerState.playbackSpeed
+            currentSpeed = playerState.playbackSpeed,
+            sleepTimerLabel = playerState.sleepTimerLabel,
+            onSleepTimerClick = {showSleepTimerDialog = true}
         )
 
         Spacer(modifier = Modifier.weight(1f))

@@ -31,7 +31,7 @@ import com.ive.audiobookplayer.utils.TimeFormatter
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material.Icon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -22,4 +22,6 @@ data class PlayerState(
     val currentCoverBitmap: Bitmap? = null,
     val showChapterList: Boolean = false,
     val libraryGroups: LibraryGroups = LibraryGroups(),
+    val sleepTimerEndTime: Long = 0L,
+    val sleepTimerLabel: String = "",
 )
