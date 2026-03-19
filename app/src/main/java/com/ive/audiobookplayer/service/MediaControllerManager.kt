@@ -2,6 +2,7 @@ package com.ive.audiobookplayer.service
 
 import android.app.Application
 import android.content.ComponentName
+import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -43,19 +44,24 @@ class MediaControllerManager(private val application: Application) {
     /**
      * Plays an audiobook, restoring position from a bookmark if provided.
      */
-    fun playAudiobook(audiobook: Audiobook, bookmark: BookmarkEntry? = null) {
+    fun playAudiobook(audiobook: Audiobook, bookmark: BookmarkEntry? = null, coverUri: Uri? = null) {
         val controller = _controller.value ?: return
 
         val wasPlaying = controller.isPlaying
 
         val mediaItems = audiobook.chapters.map { chapter ->
             MediaItem.Builder()
-                .setUri(chapter.uri.toUri())
                 .setMediaId(chapter.uri)
+                .setRequestMetadata(
+                    MediaItem.RequestMetadata.Builder()
+                        .setMediaUri(chapter.uri.toUri())
+                        .build()
+                )
                 .setMediaMetadata(
                     MediaMetadata.Builder()
                         .setTitle(chapter.title)
                         .setAlbumTitle(audiobook.title)
+                        .setArtworkUri(coverUri)
                         .build()
                 )
                 .build()

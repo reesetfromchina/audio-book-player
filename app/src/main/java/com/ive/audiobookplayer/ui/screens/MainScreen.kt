@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -41,7 +42,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
@@ -52,7 +55,6 @@ import com.ive.audiobookplayer.ui.componenets.SeekBarControl
 import com.ive.audiobookplayer.ui.componenets.SleepTimerDialog
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 import kotlinx.coroutines.delay
-
 @Composable
 fun MainScreen(
     viewModel: AudioViewModel,
@@ -70,43 +72,31 @@ fun MainScreen(
         return
     }
 
-
-    // attach player listener
     DisposableEffect(controller) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-
                 viewModel.updatePlayerState(isPlaying = isPlaying)
             }
-
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 viewModel.updatePlayerState(
-                    currentTitle = mediaItem?.mediaMetadata?.title?.toString() ?: "z1Unknown",
+                    currentTitle = mediaItem?.mediaMetadata?.title?.toString() ?: "",
                     duration = controller.duration.coerceAtLeast(0L),
                     currentChapterIndex = controller.currentMediaItemIndex,
                 )
-
-                if (playerState.sleepTimerEndTime == -1L){
+                if (playerState.sleepTimerEndTime == -1L) {
                     controller.pause()
                     viewModel.setSleepTimer(null)
                 }
             }
-
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
                 viewModel.updatePlayerState(playbackSpeed = playbackParameters.speed)
             }
-
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
-                    viewModel.updatePlayerState(
-                        duration = controller.duration.coerceAtLeast(0L)
-                    )
-
-                    // update current chapter duration
+                    viewModel.updatePlayerState(duration = controller.duration.coerceAtLeast(0L))
                     viewModel.updateCurrentChapterDuration(controller.duration.coerceAtLeast(0L))
                 }
             }
-
         }
         controller.addListener(listener)
         onDispose { controller.removeListener(listener) }
@@ -129,42 +119,54 @@ fun MainScreen(
         )
     }
 
+    if (showSleepTimerDialog) {
+        SleepTimerDialog(
+            currentLabel = playerState.sleepTimerLabel,
+            onDismiss = { showSleepTimerDialog = false },
+            onTimerSelected = { viewModel.setSleepTimer(it) },
+            onEndChapter = { viewModel.setSleepTimerEndOfChapter() }
+        )
+    }
+
+    // cover size adapts to screen height
+    val configuration = LocalConfiguration.current
+    val coverSize = (configuration.screenHeightDp * 0.28f).dp.coerceIn(140.dp, 260.dp)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(WindowInsets.safeDrawing.asPaddingValues())
-            .padding(16.dp),
+            .padding(horizontal = 24.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Book title
         Text(
             text = playerState.currentBookTitle.ifEmpty { playerState.currentTitle },
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             textAlign = TextAlign.Center,
             maxLines = 2,
-
+            overflow = TextOverflow.Ellipsis,
         )
 
+        // chapter info — only shown when relevant
         if ((playerState.currentAudiobook?.chapters?.size ?: 0) > 1) {
+            Spacer(Modifier.height(2.dp))
             Text(
-                text = "Chapter ${playerState.currentChapterIndex + 1} of ${playerState.currentAudiobook?.chapters?.size}",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = playerState.currentTitle,
+                text = "Chapter ${playerState.currentChapterIndex + 1} · ${playerState.currentTitle}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
 
+        Spacer(Modifier.weight(1f))
 
+        // Cover art
         Box(
             modifier = Modifier
-                .size(220.dp)
+                .size(coverSize)
                 .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .clickable(enabled = playerState.currentAudiobook != null) { onPickCover() },
@@ -177,12 +179,11 @@ fun MainScreen(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(8.dp)
-                        .size(32.dp)
+                        .size(28.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
                     contentAlignment = Alignment.Center
@@ -190,7 +191,7 @@ fun MainScreen(
                     Icon(
                         Icons.Default.Edit,
                         contentDescription = "Change cover",
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             } else {
@@ -198,10 +199,10 @@ fun MainScreen(
                     Icon(
                         Icons.Default.Done,
                         contentDescription = null,
-                        modifier = Modifier.size(64.dp),
+                        modifier = Modifier.size(48.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         "Tap to add cover",
                         style = MaterialTheme.typography.bodySmall,
@@ -211,7 +212,7 @@ fun MainScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(Modifier.weight(1f))
 
         SeekBarControl(
             controller = controller,
@@ -220,49 +221,49 @@ fun MainScreen(
             onPositionChange = { viewModel.updatePlayerState(currentPosition = it) }
         )
 
+        Spacer(Modifier.height(8.dp))
+
         PlayerControls(
             controller = controller,
             isPlaying = playerState.isPlaying,
         )
-        if (showSleepTimerDialog) {
-            SleepTimerDialog(
-                currentLabel = playerState.sleepTimerLabel,
-                onDismiss = { showSleepTimerDialog = false },
-                onTimerSelected = { viewModel.setSleepTimer(it) },
-                onEndChapter = { viewModel.setSleepTimerEndOfChapter() }
-            )
-        }
+
+        Spacer(Modifier.height(8.dp))
 
         PlaybackSpeedControl(
             controller = controller,
             currentSpeed = playerState.playbackSpeed,
             sleepTimerLabel = playerState.sleepTimerLabel,
-            onSleepTimerClick = {showSleepTimerDialog = true}
+            onSleepTimerClick = { showSleepTimerDialog = true }
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(Modifier.weight(1f))
 
-        if ((playerState.currentAudiobook?.chapters?.size ?: 0) > 1) {
-            OutlinedButton(
-                onClick = { viewModel.toggleChapterList() },
+        // bottom actions
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if ((playerState.currentAudiobook?.chapters?.size ?: 0) > 1) {
+                OutlinedButton(
+                    onClick = { viewModel.toggleChapterList() },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.List,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Chapters (${playerState.currentAudiobook?.chapters?.size})")
+                }
+            }
+            Button(
+                onClick = onBackToLibrary,
+                modifier = Modifier.weight(1f)
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.List,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Chapters (${playerState.currentAudiobook?.chapters?.size})")
+                Text("Library")
             }
         }
-        Spacer(modifier = Modifier.weight(1f))
-
-        Button(
-            onClick = onBackToLibrary,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back to Library")
-        }
-
     }
 }

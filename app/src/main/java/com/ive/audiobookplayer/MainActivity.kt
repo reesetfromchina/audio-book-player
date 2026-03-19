@@ -59,12 +59,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-
             AudioBookTheme {
-
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
                 ) {
 
                     val playerState by viewModel.playerState.collectAsState()
@@ -100,8 +97,7 @@ class MainActivity : ComponentActivity() {
                             MainScreen(
                                 viewModel = viewModel,
                                 onBackToLibrary = { navController.popBackStack() },
-                                onPickCover = { imagePicker.launch(arrayOf("image/*")) }
-                            )
+                                onPickCover = { imagePicker.launch(arrayOf("image/*")) })
                         }
                     }
                 }

@@ -4,130 +4,133 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
-import android.graphics.Bitmap
 import android.os.Build
 import android.util.Log
-import androidx.media3.common.Player
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import androidx.media3.ui.PlayerNotificationManager
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import com.ive.audiobookplayer.MainActivity
 import com.ive.audiobookplayer.R
+import kotlinx..launch
 
 
 @UnstableApi
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
-    private var player: ExoPlayer? = null
-    private var notificationManager: PlayerNotificationManager? = null
 
     override fun onCreate() {
         super.onCreate()
+        createNotificationChannel()
 
+        val player = ExoPlayer.Builder(this)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)  // speech = audiobook
+                    .build(),
+                true  // this true is the key — handleAudioFocus = true
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+
+        setMediaNotificationProvider(
+            DefaultMediaNotificationProvider(this).apply {
+                setSmallIcon(R.drawable.ic_notification)
+            }
+        )
+
+        mediaSession = MediaSession.Builder(this, player)
+            .setSessionActivity(buildPendingIntent())
+            .setCallback(MediaSessionCallback())
+            .build()
+    }
+
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                "playback_channel",
+                CHANNEL_ID,
                 "Playback",
                 NotificationManager.IMPORTANCE_LOW
-            )
+            ).apply {
+                description = "Audiobook playback controls"
+            }
             getSystemService(NotificationManager::class.java)
                 .createNotificationChannel(channel)
         }
+    }
 
-        player = ExoPlayer.Builder(this).build()
-
+    private fun buildPendingIntent(): PendingIntent {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        val pendingIntent = PendingIntent.getActivity(
+        return PendingIntent.getActivity(
             this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        mediaSession = MediaSession.Builder(this, player!!)
-            .setSessionActivity(pendingIntent)
-            .build()
-
-        setupNotification()
     }
 
-    private fun setupNotification() {
-        val notificationListener = object : PlayerNotificationManager.NotificationListener {
-            override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
-                stopForeground(STOP_FOREGROUND_LEGACY)
-                stopSelf()
-            }
+    // handles artwork loading for notification and lock screen
+    private inner class MediaSessionCallback : MediaSession.Callback {
+
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            return Futures.immediateFuture(
+                MediaSession.MediaItemsWithStartPosition(
+                    emptyList(),
+                    0,
+                    0L
+                )
+            )
         }
 
-        notificationManager = PlayerNotificationManager.Builder(
-            this,
-            1,
-            "playback_channel"
-        )
-            .setMediaDescriptionAdapter(object : PlayerNotificationManager.MediaDescriptionAdapter {
-                override fun createCurrentContentIntent(player: Player): PendingIntent? {
-                    Log.d("Notification", "createCurrentContentIntent called")
-                    val intent = Intent(this@PlaybackService, MainActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    }
-                    return PendingIntent.getActivity(
-                        this@PlaybackService,
-                        0,
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                    )
-                }
-
-                override fun getCurrentContentTitle(player: Player): CharSequence {
-                    return player.currentMediaItem?.mediaMetadata?.title ?: "No Track"
-                }
-
-                override fun getCurrentContentText(player: Player): CharSequence {
-                    return player.currentMediaItem?.mediaMetadata?.artist ?: "Audiobook"
-                }
-
-                override fun getCurrentLargeIcon(
-                    player: Player,
-                    callback: PlayerNotificationManager.BitmapCallback
-                ): Bitmap? {
-                    return null
-                }
-            })
-            .setChannelNameResourceId(R.string.app_name)
-            .setChannelDescriptionResourceId(R.string.app_name)
-            .setNotificationListener(notificationListener)
-            .build()
-            .also { manager ->
-                manager.setPlayer(player)
-                manager.setUseFastForwardAction(true)
-                manager.setUseRewindAction(true)
-                manager.setUseNextAction(true)
-                manager.setUsePreviousAction(true)
-                manager.setUsePlayPauseActions(true)
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: List<MediaItem>
+        ): ListenableFuture<List<MediaItem>> {
+            val resolvedItems = mediaItems.map { item ->
+                item.buildUpon()
+                    .setUri(item.requestMetadata.mediaUri ?: return@map item)
+                    .build()
             }
+            return Futures.immediateFuture(resolvedItems)
+        }
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
-        return mediaSession
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+        return START_STICKY
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        player?.playWhenReady = false
-        player?.stop()
-        stopSelf()
+        val player = mediaSession?.player ?: return
+        if (!player.playWhenReady || player.mediaItemCount == 0) {
+            stopSelf()
+        }
     }
 
     override fun onDestroy() {
-        notificationManager?.setPlayer(null)
         mediaSession?.run {
             player.release()
             release()
         }
         mediaSession = null
-        player = null
         super.onDestroy()
+    }
+
+    companion object {
+        const val CHANNEL_ID = "playback_channel"
     }
 }

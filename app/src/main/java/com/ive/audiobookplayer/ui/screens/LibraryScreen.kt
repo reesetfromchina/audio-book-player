@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -36,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,6 +51,7 @@ import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryGroups
 import com.ive.audiobookplayer.utils.calculateProgress
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 fun LibraryScreen(
@@ -63,6 +66,21 @@ fun LibraryScreen(
     libraryGroups: LibraryGroups
 ) {
     val coverCache by viewModel.coverCache.collectAsState()
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo
+                .mapNotNull { it.key as? String }
+                .filter { !it.startsWith("header_") && !it.startsWith("spacer_") }
+        }
+            .distinctUntilChanged()
+            .collect { visibleIds ->
+                if (visibleIds.isNotEmpty()) {
+                    viewModel.onBooksVisible(visibleIds)
+                }
+            }
+    }
 
     Column(
         modifier = Modifier
@@ -70,36 +88,6 @@ fun LibraryScreen(
             .padding(WindowInsets.safeDrawing.asPaddingValues())
             .padding(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("My Library", style = MaterialTheme.typography.headlineMedium)
-            if (isBackgroundScanning) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp)
-                    Text(
-                        "Updating...",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        if (audiobooks.isNotEmpty()) {
-            Button(onClick = onPickFolder, modifier = Modifier.fillMaxWidth()) {
-                Text("Change Folder")
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
 
         when {
             isScanning -> {
@@ -112,29 +100,43 @@ fun LibraryScreen(
                 }
             }
             !isLibraryLoaded || audiobooks.isEmpty() -> {
+                // first launch OR empty library — always show the picker
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("No audiobooks found.")
-                        Spacer(Modifier.height(8.dp))
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "No audiobooks found",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            "Pick a folder containing your audiobooks",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Button(onClick = onPickFolder) {
-                            Text("Pick Library Folder")
+                            Text("Pick folder")
                         }
                     }
                 }
             }
             else -> {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     if (libraryGroups.inProgress.isNotEmpty()) {
-                        item {
+                        item(key = "header_inprogress") {  // unique key for header
                             LibrarySectionHeader(
                                 title = "In Progress",
                                 count = libraryGroups.inProgress.size
                             )
                         }
-                        items(libraryGroups.inProgress, key = { it.id }) { book ->
-                            if (!coverCache.containsKey(book.id)) {
-                                LaunchedEffect(book.id) { viewModel.loadCoverForBook(book) }
-                            }
+                        items(
+                            items = libraryGroups.inProgress,
+                            key = { it.id }  // book ID as key
+                        ) { book ->
                             AudiobookCard(
                                 audiobook = book,
                                 bookmark = bookmarks[book.id],
@@ -142,19 +144,22 @@ fun LibraryScreen(
                                 onClick = { onAudiobookSelected(book) }
                             )
                         }
-                        item { Spacer(Modifier.height(8.dp)) }
+                        item(key = "spacer_inprogress") {  // ✅ Unique key for spacer
+                            Spacer(Modifier.height(8.dp))
+                        }
                     }
+
                     if (libraryGroups.unplayed.isNotEmpty()) {
-                        item {
+                        item(key = "header_unplayed") {
                             LibrarySectionHeader(
                                 title = "Unplayed",
                                 count = libraryGroups.unplayed.size
                             )
                         }
-                        items(libraryGroups.unplayed, key = { it.id }) { book ->
-                            if (!coverCache.containsKey(book.id)) {
-                                LaunchedEffect(book.id) { viewModel.loadCoverForBook(book) }
-                            }
+                        items(
+                            items = libraryGroups.unplayed,
+                            key = { it.id }
+                        ) { book ->
                             AudiobookCard(
                                 audiobook = book,
                                 bookmark = bookmarks[book.id],
@@ -162,20 +167,23 @@ fun LibraryScreen(
                                 onClick = { onAudiobookSelected(book) }
                             )
                         }
-                        item { Spacer(Modifier.height(8.dp)) }
+                        item(key = "spacer_unplayed") {
+                            Spacer(Modifier.height(8.dp))
+                        }
                     }
 
                     if (libraryGroups.finished.isNotEmpty()) {
-                        item {
+                        item(key = "header_finished") {
                             LibrarySectionHeader(
                                 title = "Finished",
                                 count = libraryGroups.finished.size
                             )
                         }
-                        items(libraryGroups.finished, key = { it.id }) { book ->
-                            if (!coverCache.containsKey(book.id)) {
-                                LaunchedEffect(book.id) { viewModel.loadCoverForBook(book) }
-                            }
+                        items(
+                            items = libraryGroups.finished,
+                            key = { it.id }
+                        ) { book ->
+                            // ✅ NO LaunchedEffect here!
                             AudiobookCard(
                                 audiobook = book,
                                 bookmark = bookmarks[book.id],
@@ -190,7 +198,6 @@ fun LibraryScreen(
         }
     }
 }
-
 @Composable
 fun LibrarySectionHeader(title: String, count: Int) {
     Row(
@@ -259,7 +266,7 @@ fun AudiobookCard(
                     Icon(
                         Icons.Default.MusicNote,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
                 }
                 if (isFinished) {

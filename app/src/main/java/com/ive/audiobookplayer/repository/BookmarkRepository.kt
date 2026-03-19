@@ -57,15 +57,15 @@ class BookmarkRepository(private val context: Context) {
         }.getOrNull()
     }
 
-    suspend fun saveBookmark(entry: BookmarkEntry) {
-        val key = stringPreferencesKey("bookmark_${entry.audiobookId}")
+    suspend fun saveBookmark(bookmarkEntry: BookmarkEntry) {
+        val key = stringPreferencesKey("bookmark_${bookmarkEntry.audiobookId}")
         Log.d(
             "Bookmark",
-            "saveBookmark id=${entry.audiobookId} chapter=${entry.chapterIndex} pos=${entry.positionMs}"
+            "saveBookmark id=${bookmarkEntry.audiobookId} chapter=${bookmarkEntry.chapterIndex} pos=${bookmarkEntry.positionMs}"
         )
         context.bookmarkDataStore.edit { prefs ->
-            prefs[key] = json.encodeToString(entry)
-            prefs[LAST_BOOK_ID_KEY] = entry.audiobookId
+            prefs[key] = json.encodeToString(bookmarkEntry)
+            prefs[LAST_BOOK_ID_KEY] = bookmarkEntry.audiobookId
         }
     }
 
@@ -92,6 +92,10 @@ class BookmarkRepository(private val context: Context) {
     suspend fun getSpeed(audiobookId: String): Float {
         val key = stringPreferencesKey("$SPEED_KEY_PREFIX${audiobookId.hashCode()}")
         return context.bookmarkDataStore.data.first()[key]?.toFloat() ?: 1f
+    }
+
+    suspend fun getLastBookId(): String? {
+        return context.bookmarkDataStore.data.first()[LAST_BOOK_ID_KEY]
     }
 
 
