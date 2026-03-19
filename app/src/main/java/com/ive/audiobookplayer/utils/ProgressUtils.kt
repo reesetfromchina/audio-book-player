@@ -9,13 +9,13 @@ fun calculateProgress(audiobook: Audiobook, bookmark: BookmarkEntry?): Float {
 
     val totalDuration = audiobook.chapters.sumOf { it.durationMs }
 
-    val effectiveTotal = if (totalDuration > 0L) totalDuration else bookmark.totalDurationMs
-    if (effectiveTotal <= 0L) return 0f
+//    val effectiveTotal = if (totalDuration > 0L) totalDuration else bookmark.totalDurationMs
+    if (totalDuration <= 0L) return 0f
 
     val completedDuration = audiobook.chapters
         .take(bookmark.chapterIndex)
         .sumOf { it.durationMs }
 
-    return (((completedDuration + bookmark.positionMs).toFloat() / effectiveTotal) * 100f)
+    return (((completedDuration + bookmark.positionMs).toFloat() / totalDuration) * 100f)
         .coerceIn(0f, 100f)
 }

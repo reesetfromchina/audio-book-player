@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
                 ) {
 
                     val playerState by viewModel.playerState.collectAsState()
+                    val libraryState by viewModel.libraryState.collectAsState()
                     val navController = rememberNavController()
                     if (navigateToPlayer.value) {
                         LaunchedEffect(Unit) {
@@ -80,17 +81,17 @@ class MainActivity : ComponentActivity() {
                         composable("library") {
                             LibraryScreen(
                                 viewModel = viewModel,
-                                audiobooks = playerState.audiobooks,
-                                bookmarks = playerState.bookmarks,
+                                audiobooks = libraryState.audiobooks,
+                                bookmarks = libraryState.bookmarks,
                                 onAudiobookSelected = { book ->
                                     viewModel.playAudiobook(book)
                                     navController.navigate("player")
                                 },
                                 onPickFolder = { folderPickerLauncher.launch(null) },
-                                isLibraryLoaded = playerState.isLibraryLoaded,
-                                isScanning = playerState.isScanning,
-                                isBackgroundScanning = playerState.isBackgroundScanning,
-                                libraryGroups = playerState.libraryGroups
+                                isLibraryLoaded = libraryState.isLoaded,
+                                isScanning = libraryState.isScanning,
+                                isBackgroundScanning = libraryState.isBackgroundScanning,
+                                libraryGroups = libraryState.libraryGroups,
                             )
                         }
                         composable("player") {

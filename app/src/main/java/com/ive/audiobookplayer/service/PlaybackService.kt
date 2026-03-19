@@ -18,7 +18,6 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.ive.audiobookplayer.MainActivity
 import com.ive.audiobookplayer.R
-import kotlinx..launch
 
 
 @UnstableApi
@@ -80,6 +79,7 @@ class PlaybackService : MediaSessionService() {
     // handles artwork loading for notification and lock screen
     private inner class MediaSessionCallback : MediaSession.Callback {
 
+        @Deprecated("Deprecated in Java")
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo

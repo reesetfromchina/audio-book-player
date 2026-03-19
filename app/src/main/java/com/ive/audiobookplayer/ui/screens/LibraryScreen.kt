@@ -63,7 +63,7 @@ fun LibraryScreen(
     isLibraryLoaded: Boolean,
     isScanning: Boolean,
     isBackgroundScanning: Boolean,
-    libraryGroups: LibraryGroups
+    libraryGroups: LibraryGroups,
 ) {
     val coverCache by viewModel.coverCache.collectAsState()
     val listState = rememberLazyListState()
@@ -90,6 +90,7 @@ fun LibraryScreen(
     ) {
 
         when {
+
             isScanning -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {

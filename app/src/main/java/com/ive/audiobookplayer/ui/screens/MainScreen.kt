@@ -62,6 +62,7 @@ fun MainScreen(
     onPickCover: () -> Unit
 ) {
     val playerState by viewModel.playerState.collectAsState()
+    val libraryState by viewModel.libraryState.collectAsState()
     val controller = playerState.controller
     var showSleepTimerDialog by remember { mutableStateOf(false) }
 
@@ -113,7 +114,7 @@ fun MainScreen(
         ChapterListSheet(
             audiobook = playerState.currentAudiobook!!,
             currentChapterIndex = playerState.currentChapterIndex,
-            bookmarks = playerState.bookmarks,
+            bookmarks = libraryState.bookmarks,
             onChapterSelected = { viewModel.jumpToChapter(it) },
             onDismiss = { viewModel.toggleChapterList() }
         )

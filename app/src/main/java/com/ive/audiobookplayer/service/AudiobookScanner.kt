@@ -1,7 +1,7 @@
 package com.ive.audiobookplayer.service
 
-import android.app.appsearch.observer.DocumentChangeInfo
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
@@ -46,6 +46,22 @@ class AudiobookScanner(private val context: Context) {
         return firstImageUri
     }
 
+    private fun getAudioDuration(uri: Uri): Long {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, uri)
+            val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toLongOrNull() ?: 0L
+            Log.d("Scanner", "Duration for $uri = $duration")
+            duration
+        } catch (e: Exception) {
+            Log.e("Scanner", "Failed to get duration for $uri", e)
+            0L
+        } finally {
+            retriever.release()
+        }
+    }
+
     private fun buildAudiobook(
         rootUri: Uri,
         folderName: String,
@@ -57,12 +73,41 @@ class AudiobookScanner(private val context: Context) {
             Chapter(
                 uri = uri.toString(),
                 title = name.substringBeforeLast("."),
-                index = index
+                index = index,
+                durationMs = getAudioDuration(uri)
             )
         }
         val id = "${folderName}_${folderDocId.hashCode()}"
         val coverUri = findFolderCover(rootUri, folderDocId)
         return Audiobook(id = id, title = folderName, chapters = chapters, coverUri = coverUri)
+    }
+
+    // New fast scan in AudiobookScanner — only reads names and IDs, no duration
+    fun scanFolderFast(rootUri: Uri): List<Pair<String, String>> {
+        // returns list of (id, name) pairs only
+        val rootDocId = DocumentsContract.getTreeDocumentId(rootUri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, rootDocId)
+        val ids = mutableListOf<Pair<String, String>>()
+
+        context.contentResolver.query(
+            childrenUri,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE
+            ),
+            null, null, null
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val docId = cursor.getString(0)
+                val name = cursor.getString(1)
+                val mime = cursor.getString(2)
+                if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                    ids.add(docId to name)
+                }
+            }
+        }
+        return ids
     }
 
     fun scanFolder(rootUri: Uri): List<Audiobook> {
@@ -106,7 +151,7 @@ class AudiobookScanner(private val context: Context) {
                 Audiobook(
                     id = "${title}_${docId.hashCode()}",
                     title = title,
-                    chapters = listOf(Chapter(uri = uri.toString(), title = title, index = 0))
+                    chapters = listOf(Chapter(uri = uri.toString(), title = title, index = 0, durationMs = getAudioDuration(uri)))
                 )
             )
         }

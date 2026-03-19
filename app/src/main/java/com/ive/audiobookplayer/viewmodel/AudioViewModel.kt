@@ -28,6 +28,7 @@ import com.ive.audiobookplayer.repository.CoverArtRepository
 import com.ive.audiobookplayer.utils.CoverArtExtractor
 import androidx.core.net.toUri
 import com.ive.audiobookplayer.model.LibraryGroups
+import com.ive.audiobookplayer.model.LibraryState
 import com.ive.audiobookplayer.utils.calculateProgress
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
@@ -50,6 +51,10 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private val _playerState = MutableStateFlow(PlayerState())
     val playerState: StateFlow<PlayerState> = _playerState.asStateFlow()
 
+    private val _libraryState = MutableStateFlow(LibraryState())
+    val libraryState: StateFlow<LibraryState> = _libraryState.asStateFlow()
+
+
     private val _coverCache = MutableStateFlow<Map<String, Bitmap>>(emptyMap())
     val coverCache: StateFlow<Map<String, Bitmap>> = _coverCache.asStateFlow()
 
@@ -68,7 +73,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             bookmarkRepository.bookmarks.collect { bookmarks ->
-                _playerState.update { it.copy(bookmarks = bookmarks) }
+                _libraryState.update { it.copy(bookmarks = bookmarks) }
                 updateLibraryGroups()
             }
         }
@@ -76,8 +81,8 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val cached = bookmarkRepository.loadLibraryCache()
             if (cached.isNotEmpty()) {
-                _playerState.update {
-                    it.copy(audiobooks = cached, isLibraryLoaded = true)
+                _libraryState.update {
+                    it.copy(audiobooks = cached, isLoaded = true)
                 }
             }
 
@@ -90,9 +95,10 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            // todo delete this ??
             // restore last opened book
             bookmarkRepository.getLastBookId()?.let { lastId ->
-                val lastBook = _playerState.value.audiobooks.find {
+                val lastBook = _libraryState.value.audiobooks.find {
                     it.id == lastId
                 }
                 if (lastBook != null) {
@@ -160,7 +166,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.IO) {
                 batch.map { bookId ->
                     launch {
-                        val audiobook = _playerState.value.audiobooks.find { it.id == bookId }
+                        val audiobook = _libraryState.value.audiobooks.find { it.id == bookId }
                         if (audiobook != null) {
                             loadSingleCover(audiobook)
                         }
@@ -269,48 +275,78 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     fun scanLibrary(rootUri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
-            _playerState.update { it.copy(isScanning = true) }
-
-            bookmarkRepository.saveRootFolderUri(rootUri)
-            val audiobooks = audiobookScanner.scanFolder(rootUri)
-            bookmarkRepository.saveLibraryCache(audiobooks)
-
-            _playerState.update {
-                it.copy(
-                    audiobooks = audiobooks, isLibraryLoaded = true, isScanning = false
-                )
+            _libraryState.update { it.copy(isScanning = true) }
+            try {
+                bookmarkRepository.saveRootFolderUri(rootUri)
+                val audiobooks = audiobookScanner.scanFolder(rootUri)
+                bookmarkRepository.saveLibraryCache(audiobooks)
+                _libraryState.update {
+                    it.copy(
+                        audiobooks = audiobooks,
+                        isLoaded = true,
+                        isScanning = false
+                    )
+                }
+                updateLibraryGroups()
+            } catch (e: Exception) {
+                Log.e("Library", "Scan failed", e)
+                _libraryState.update { it.copy(isScanning = false) }
             }
-            updateLibraryGroups()
         }
     }
 
     private fun backgroundRescan(rootUri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
-            _playerState.update { it.copy(isBackgroundScanning = true) }
+            _libraryState.update { it.copy(isBackgroundScanning = true) }
+            try {
+                val fastScan = audiobookScanner.scanFolderFast(rootUri)
+                val cachedIds = _libraryState.value.audiobooks.map { it.id }.toSet()
+                val freshIds = fastScan.map { (docId, name) ->
+                    "${name}_${docId.hashCode()}"
+                }.toSet()
 
+                // only do the slow full scan if somehting actually changed
+                if(cachedIds != freshIds){
+                    val fresh = audiobookScanner.scanFolder(rootUri)
+                    bookmarkRepository.saveLibraryCache(fresh)
+                    _libraryState.update { it.copy(audiobooks = fresh) }
+                    updateLibraryGroups()
+                }
+            }catch (e: Exception){
+                Log.e("Library","Background rescan failed", e)
+            } finally {
+                _libraryState.update { it.copy(isBackgroundScanning = false) }
+                updateLibraryGroups()
+            }
             val freshAudiobooks = audiobookScanner.scanFolder(rootUri)
-            val cachedAudiobooks = _playerState.value.audiobooks
+            val cachedAudiobooks = _libraryState.value.audiobooks
 
             val hasChanges = hasLibraryChanged(cachedAudiobooks, freshAudiobooks)
             if (hasChanges) {
                 bookmarkRepository.saveLibraryCache(freshAudiobooks)
-                _playerState.update {
+                _libraryState.update {
                     it.copy(audiobooks = freshAudiobooks)
                 }
             }
 
-            _playerState.update { it.copy(isBackgroundScanning = false) }
+            _libraryState.update { it.copy(isBackgroundScanning = false) }
             updateLibraryGroups()
         }
     }
 
     private fun hasLibraryChanged(
-        cached: List<Audiobook>, fresh: List<Audiobook>
+        cached: List<Audiobook>,
+        fresh: List<Audiobook>
     ): Boolean {
         if (cached.size != fresh.size) return true
-        val cachedIds = cached.map { it.id }.toSet()
-        val freshIds = fresh.map { it.id }.toSet()
-        return cachedIds != freshIds
+        val cachedMap = cached.associateBy { it.id }
+        return fresh.any { freshBook ->
+            val cachedBook = cachedMap[freshBook.id] ?: return true
+            // check if any chapter duration changed
+            cachedBook.chapters.zip(freshBook.chapters).any { (c, f) ->
+                c.durationMs != f.durationMs
+            }
+        }
     }
 
     @OptIn(UnstableApi::class)
@@ -522,8 +558,8 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateLibraryGroups() {
-        val audiobooks = _playerState.value.audiobooks
-        val bookmarks = _playerState.value.bookmarks
+        val audiobooks = _libraryState.value.audiobooks
+        val bookmarks = _libraryState.value.bookmarks
 
         val inProgress = mutableListOf<Audiobook>()
         val unplayed = mutableListOf<Audiobook>()
@@ -545,7 +581,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         // unplayed alph
         unplayed.sortBy { it.title }
 
-        _playerState.update {
+        _libraryState.update {
             it.copy(
                 libraryGroups = LibraryGroups(
                     inProgress, unplayed, finished
