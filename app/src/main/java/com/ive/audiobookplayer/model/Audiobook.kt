@@ -1,7 +1,8 @@
 package com.ive.audiobookplayer.model
 
+import androidx.compose.runtime.Stable
 import kotlinx.serialization.Serializable
-
+@Stable
 @Serializable
 data class Audiobook(
     val id: String,
@@ -20,7 +21,7 @@ data class Chapter(
 ) {
     val isUnknownDuration get() = durationMs == 0L
 }
-
+@Stable
 @Serializable
 data class BookmarkEntry(
     val audiobookId: String,

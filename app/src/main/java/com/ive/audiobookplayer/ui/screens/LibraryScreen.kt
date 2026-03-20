@@ -17,18 +17,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,26 +52,23 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
-import com.ive.audiobookplayer.model.LibraryGroups
+import com.ive.audiobookplayer.model.LibraryState
+import com.ive.audiobookplayer.ui.componenets.AudiobookGrid
 import com.ive.audiobookplayer.utils.calculateProgress
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 @Composable
 fun LibraryScreen(
     viewModel: AudioViewModel,
-    audiobooks: List<Audiobook>,
-    bookmarks: Map<String, BookmarkEntry>,
     onAudiobookSelected: (Audiobook) -> Unit,
     onPickFolder: () -> Unit,
-    isLibraryLoaded: Boolean,
-    isScanning: Boolean,
-    isInitializing: Boolean,
-    libraryGroups: LibraryGroups,
+    library: LibraryState,
 ) {
-    val coverCache by viewModel.coverCache.collectAsState()
     val listState = rememberLazyListState()
 
     LaunchedEffect(listState) {
@@ -76,9 +79,7 @@ fun LibraryScreen(
         }
             .distinctUntilChanged()
             .collect { visibleIds ->
-                if (visibleIds.isNotEmpty()) {
-                    viewModel.onBooksVisible(visibleIds)
-                }
+                if (visibleIds.isNotEmpty()) viewModel.onBooksVisible(visibleIds)
             }
     }
 
@@ -86,16 +87,45 @@ fun LibraryScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(WindowInsets.safeDrawing.asPaddingValues())
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Library", style = MaterialTheme.typography.headlineSmall)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (library.isBackgroundScanning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
+                IconButton(onClick = { viewModel.toggleLibraryView() }) {
+                    Icon(
+                        imageVector = if (library.isGridView) Icons.Default.ViewList
+                        else Icons.Default.GridView,
+                        contentDescription = null
+                    )
+                }
+                IconButton(onClick = onPickFolder) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = "Change folder")
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
 
         when {
-            isInitializing -> {
+            library.isInitializing -> {
                 Box(Modifier.fillMaxSize())
-
             }
 
-            isScanning -> {
+            library.isScanning -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
@@ -105,27 +135,36 @@ fun LibraryScreen(
                 }
             }
 
-            !isLibraryLoaded || audiobooks.isEmpty() -> {
-                // first launch OR empty library — always show the picker
+            library.audiobooks.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            "No audiobooks found",
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        Text("No audiobooks found", style = MaterialTheme.typography.titleMedium)
                         Text(
                             "Pick a folder containing your audiobooks",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Button(onClick = onPickFolder) {
-                            Text("Pick folder")
-                        }
+                        Button(onClick = onPickFolder) { Text("Pick folder") }
                     }
                 }
+            }
+
+            library.isGridView -> {
+                val sortedBooks = remember(library.groups) {
+                    library.groups.inProgress +
+                            library.groups.unplayed +
+                            library.groups.finished
+                }
+                AudiobookGrid(
+                    audiobooks = sortedBooks,
+                    bookmarks = library.bookmarks,
+                    onAudiobookSelected = onAudiobookSelected,
+                    viewModel = viewModel,
+                    onBooksVisible = { viewModel.onBooksVisible(it) }
+                )
             }
 
             else -> {
@@ -133,75 +172,59 @@ fun LibraryScreen(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (libraryGroups.inProgress.isNotEmpty()) {
-                        item(key = "header_inprogress") {  // unique key for header
-                            LibrarySectionHeader(
-                                title = "In Progress",
-                                count = libraryGroups.inProgress.size
-                            )
-                        }
-                        items(
-                            items = libraryGroups.inProgress,
-                            key = { it.id }  // book ID as key
-                        ) { book ->
-                            AudiobookCard(
-                                audiobook = book,
-                                bookmark = bookmarks[book.id],
-                                coverBitmap = coverCache[book.id],
-                                onClick = { onAudiobookSelected(book) }
-                            )
-                        }
-                        item(key = "spacer_inprogress") {
-                            Spacer(Modifier.height(8.dp))
-                        }
-                    }
-
-                    if (libraryGroups.unplayed.isNotEmpty()) {
-                        item(key = "header_unplayed") {
-                            LibrarySectionHeader(
-                                title = "Unplayed",
-                                count = libraryGroups.unplayed.size
-                            )
-                        }
-                        items(
-                            items = libraryGroups.unplayed,
-                            key = { it.id }
-                        ) { book ->
-                            AudiobookCard(
-                                audiobook = book,
-                                bookmark = bookmarks[book.id],
-                                coverBitmap = coverCache[book.id],
-                                onClick = { onAudiobookSelected(book) }
-                            )
-                        }
-                        item(key = "spacer_unplayed") {
-                            Spacer(Modifier.height(8.dp))
-                        }
-                    }
-
-                    if (libraryGroups.finished.isNotEmpty()) {
-                        item(key = "header_finished") {
-                            LibrarySectionHeader(
-                                title = "Finished",
-                                count = libraryGroups.finished.size
-                            )
-                        }
-                        items(
-                            items = libraryGroups.finished,
-                            key = { it.id }
-                        ) { book ->
-                            AudiobookCard(
-                                audiobook = book,
-                                bookmark = bookmarks[book.id],
-                                coverBitmap = coverCache[book.id],
-                                isFinished = true,
-                                onClick = { onAudiobookSelected(book) }
-                            )
-                        }
-                    }
+                    librarySection(
+                        title = "In Progress",
+                        books = library.groups.inProgress,
+                        bookmarks = library.bookmarks,
+                        viewModel = viewModel,
+                        onAudiobookSelected = onAudiobookSelected,
+                    )
+                    librarySection(
+                        title = "Unplayed",
+                        books = library.groups.unplayed,
+                        bookmarks = library.bookmarks,
+                        viewModel = viewModel,
+                        onAudiobookSelected = onAudiobookSelected,
+                    )
+                    librarySection(
+                        title = "Finished",
+                        books = library.groups.finished,
+                        bookmarks = library.bookmarks,
+                        viewModel = viewModel,
+                        onAudiobookSelected = onAudiobookSelected,
+                        isFinished = true,
+                    )
                 }
             }
         }
+    }
+}
+
+private fun LazyListScope.librarySection(
+    title: String,
+    books: List<Audiobook>,
+    bookmarks: Map<String, BookmarkEntry>,
+    viewModel: AudioViewModel,
+    onAudiobookSelected: (Audiobook) -> Unit,
+    isFinished: Boolean = false,
+) {
+    if (books.isEmpty()) return
+    val key = title.lowercase().replace(" ", "_")
+
+    item(key = "header_$key") {
+        LibrarySectionHeader(title = title, count = books.size)
+    }
+    items(items = books, key = { it.id }) { book ->
+        AudiobookCard(
+            audiobook = book,
+            bookmark = bookmarks[book.id],
+            isFinished = isFinished,
+            viewModel = viewModel,
+            onClick = { onAudiobookSelected(book) }
+        )
+    }
+    item(key = "spacer_$key") {
+        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -234,12 +257,16 @@ fun LibrarySectionHeader(title: String, count: Int) {
 fun AudiobookCard(
     audiobook: Audiobook,
     bookmark: BookmarkEntry?,
-    coverBitmap: Bitmap? = null,
+    viewModel: AudioViewModel,
     isFinished: Boolean = false,
     onClick: () -> Unit
 ) {
     val progress = remember(bookmark) { calculateProgress(audiobook, bookmark) }
+    val coverBitmap by remember(audiobook.id) {
+        viewModel.coverCache.map { it[audiobook.id] }
+    }.collectAsState(initial = null)
 
+    val imageBitmap = remember(coverBitmap) { coverBitmap?.asImageBitmap() }
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -262,9 +289,9 @@ fun AudiobookCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (coverBitmap != null) {
+                if (imageBitmap != null) {
                     Image(
-                        bitmap = coverBitmap.asImageBitmap(),
+                        bitmap = imageBitmap,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()

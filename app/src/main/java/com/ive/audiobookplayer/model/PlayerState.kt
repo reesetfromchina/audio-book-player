@@ -23,9 +23,10 @@ data class PlayerState(
 data class LibraryState(
     val audiobooks: List<Audiobook> = emptyList(),
     val bookmarks: Map<String, BookmarkEntry> = emptyMap(),
-    val libraryGroups: LibraryGroups = LibraryGroups(),
+    val groups: LibraryGroups = LibraryGroups(),
     val isLoaded: Boolean = false,
     val isScanning: Boolean = false,
     val isBackgroundScanning: Boolean = false,
     val isInitializing: Boolean = true,
+    val isGridView: Boolean = true,
 )

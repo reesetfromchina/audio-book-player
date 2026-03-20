@@ -82,17 +82,12 @@ class MainActivity : ComponentActivity() {
                         composable("library") {
                             LibraryScreen(
                                 viewModel = viewModel,
-                                audiobooks = libraryState.audiobooks,
-                                bookmarks = libraryState.bookmarks,
                                 onAudiobookSelected = { book ->
                                     viewModel.playAudiobook(book)
                                     navController.navigate("player")
                                 },
                                 onPickFolder = { folderPickerLauncher.launch(null) },
-                                isLibraryLoaded = libraryState.isLoaded,
-                                isScanning = libraryState.isScanning,
-                                libraryGroups = libraryState.libraryGroups,
-                                isInitializing = libraryState.isInitializing
+                                library = libraryState,
                             )
                         }
                         composable("player") {

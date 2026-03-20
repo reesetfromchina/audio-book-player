@@ -178,7 +178,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun loadSingleCover(audiobook: Audiobook) {
         synchronized(loadingCovers) { loadingCovers.add(audiobook.id) }
         try {
-            val bitmap = loadCoverBitmap(audiobook, targetSize = 128)
+            val bitmap = loadCoverBitmap(audiobook, targetSize = 256)
             if (bitmap != null) {
                 _coverCache.update { it + (audiobook.id to bitmap) }
             } else {
@@ -426,7 +426,9 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         _playerState.update { it.copy(sleepTimerEndTime = -1L, sleepTimerLabel = "End of chapter") }
     }
 
-
+    fun toggleLibraryView(){
+        _libraryState.update { it.copy(isGridView = !it.isGridView) }
+    }
     private fun updateLibraryGroups() {
         val audiobooks = _libraryState.value.audiobooks
         val bookmarks = _libraryState.value.bookmarks
@@ -449,7 +451,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         unplayed.sortBy { it.title }
 
         _libraryState.update {
-            it.copy(libraryGroups = LibraryGroups(inProgress, unplayed, finished))
+            it.copy(groups = LibraryGroups(inProgress, unplayed, finished))
         }
     }
 
