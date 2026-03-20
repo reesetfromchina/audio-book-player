@@ -62,7 +62,7 @@ fun LibraryScreen(
     onPickFolder: () -> Unit,
     isLibraryLoaded: Boolean,
     isScanning: Boolean,
-    isBackgroundScanning: Boolean,
+    isInitializing: Boolean,
     libraryGroups: LibraryGroups,
 ) {
     val coverCache by viewModel.coverCache.collectAsState()
@@ -90,6 +90,10 @@ fun LibraryScreen(
     ) {
 
         when {
+            isInitializing -> {
+                Box(Modifier.fillMaxSize())
+
+            }
 
             isScanning -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -100,6 +104,7 @@ fun LibraryScreen(
                     }
                 }
             }
+
             !isLibraryLoaded || audiobooks.isEmpty() -> {
                 // first launch OR empty library — always show the picker
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -122,6 +127,7 @@ fun LibraryScreen(
                     }
                 }
             }
+
             else -> {
                 LazyColumn(
                     state = listState,
@@ -145,7 +151,7 @@ fun LibraryScreen(
                                 onClick = { onAudiobookSelected(book) }
                             )
                         }
-                        item(key = "spacer_inprogress") {  // ✅ Unique key for spacer
+                        item(key = "spacer_inprogress") {
                             Spacer(Modifier.height(8.dp))
                         }
                     }
@@ -184,7 +190,6 @@ fun LibraryScreen(
                             items = libraryGroups.finished,
                             key = { it.id }
                         ) { book ->
-                            // ✅ NO LaunchedEffect here!
                             AudiobookCard(
                                 audiobook = book,
                                 bookmark = bookmarks[book.id],
@@ -199,6 +204,7 @@ fun LibraryScreen(
         }
     }
 }
+
 @Composable
 fun LibrarySectionHeader(title: String, count: Int) {
     Row(
@@ -324,7 +330,10 @@ fun AudiobookCard(
                         val seconds = (bookmark.positionMs / 1000) % 60
                         Text(
                             if (isFinished) "Finished"
-                            else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(minutes, seconds),
+                            else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(
+                                minutes,
+                                seconds
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

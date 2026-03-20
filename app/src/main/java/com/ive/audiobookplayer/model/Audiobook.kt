@@ -12,7 +12,12 @@ data class Audiobook(
 )
 
 @Serializable
-data class Chapter(val uri: String, val title: String, val index: Int, val durationMs: Long = 0L){
+data class Chapter(
+    val uri: String,
+    val title: String,
+    val index: Int,
+    val durationMs: Long = 0L
+) {
     val isUnknownDuration get() = durationMs == 0L
 }
 

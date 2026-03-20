@@ -11,12 +11,23 @@ import com.ive.audiobookplayer.model.Chapter
 
 class AudiobookScanner(private val context: Context) {
 
-    private val AUDIO_EXTENSIONS = setOf("mp3", "m4a","m4b", "aac", "ogg", "flac", "wav", "opus")
+    companion object {
+        private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "m4b", "aac", "ogg", "flac", "wav", "opus")
+        private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
+        private val COVER_NAMES = setOf("cover", "folder", "front", "artwork")
+    }
 
-    private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
+    // single data class to hold everything found in a folder scan
+    private data class FolderContents(
+        val audioFiles: List<Pair<String, String>>,  // docId to name
+        val coverUri: String?
+    )
 
-    private fun findFolderCover(rootUri: Uri, folderDocId: String): String? {
+    // scan folder contents in ONE query instead of two separate ones
+    private fun scanFolderContents(rootUri: Uri, folderDocId: String): FolderContents {
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, folderDocId)
+        val audioFiles = mutableListOf<Pair<String, String>>()
+        var priorityCover: String? = null
         var firstImageUri: String? = null
 
         context.contentResolver.query(
@@ -28,32 +39,40 @@ class AudiobookScanner(private val context: Context) {
             null, null, null
         )?.use { cursor ->
             while (cursor.moveToNext()) {
-                val docId = cursor.getString(0)
-                val name = cursor.getString(1)
+                val docId = cursor.getString(0) ?: continue
+                val name = cursor.getString(1) ?: continue
                 val ext = name.substringAfterLast(".", "").lowercase()
 
-                if (ext in IMAGE_EXTENSIONS) {
-                    val fileUri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId).toString()
-                    val nameWithoutExt = name.substringBeforeLast(".").lowercase()
-                    if (nameWithoutExt in setOf("cover", "folder", "front", "artwork")) {
-                        return fileUri
+                when {
+                    ext in AUDIO_EXTENSIONS -> audioFiles.add(docId to name)
+                    ext in IMAGE_EXTENSIONS -> {
+                        val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId).toString()
+                        val nameWithoutExt = name.substringBeforeLast(".").lowercase()
+                        if (nameWithoutExt in COVER_NAMES) {
+                            priorityCover = uri
+                        } else if (firstImageUri == null) {
+                            firstImageUri = uri
+                        }
                     }
-                    if (firstImageUri == null) firstImageUri = fileUri
                 }
             }
         }
-        Log.d("Cover", "findFolderCover result: $firstImageUri")
-        return firstImageUri
+
+        return FolderContents(
+            audioFiles = audioFiles.sortedBy { it.second },
+            coverUri = priorityCover ?: firstImageUri
+        )
     }
 
     private fun getAudioDuration(uri: Uri): Long {
         val retriever = MediaMetadataRetriever()
         return try {
-            retriever.setDataSource(context, uri)
-            val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                ?.toLongOrNull() ?: 0L
-            Log.d("Scanner", "Duration for $uri = $duration")
-            duration
+            val pfd = context.contentResolver.openFileDescriptor(uri, "r") ?: return 0L
+            pfd.use {
+                retriever.setDataSource(it.fileDescriptor)
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    ?.toLongOrNull() ?: 0L
+            }
         } catch (e: Exception) {
             Log.e("Scanner", "Failed to get duration for $uri", e)
             0L
@@ -62,32 +81,21 @@ class AudiobookScanner(private val context: Context) {
         }
     }
 
-    private fun buildAudiobook(
-        rootUri: Uri,
-        folderName: String,
-        folderDocId: String,
-        files: List<Pair<String, String>>
-    ): Audiobook {
-        val chapters = files.mapIndexed { index, (docId, name) ->
-            val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
-            Chapter(
-                uri = uri.toString(),
-                title = name.substringBeforeLast("."),
-                index = index,
-                durationMs = getAudioDuration(uri)
-            )
-        }
-        val id = "${folderName}_${folderDocId.hashCode()}"
-        val coverUri = findFolderCover(rootUri, folderDocId)
-        return Audiobook(id = id, title = folderName, chapters = chapters, coverUri = coverUri)
+    private fun buildChapter(rootUri: Uri, docId: String, name: String, index: Int): Chapter {
+        val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
+        return Chapter(
+            uri = uri.toString(),
+            title = name.substringBeforeLast("."),
+            index = index,
+            durationMs = getAudioDuration(uri)
+        )
     }
 
-    // New fast scan in AudiobookScanner — only reads names and IDs, no duration
+    // fast scan — only folder names and IDs, no file opening
     fun scanFolderFast(rootUri: Uri): List<Pair<String, String>> {
-        // returns list of (id, name) pairs only
         val rootDocId = DocumentsContract.getTreeDocumentId(rootUri)
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, rootDocId)
-        val ids = mutableListOf<Pair<String, String>>()
+        val folders = mutableListOf<Pair<String, String>>()
 
         context.contentResolver.query(
             childrenUri,
@@ -99,25 +107,25 @@ class AudiobookScanner(private val context: Context) {
             null, null, null
         )?.use { cursor ->
             while (cursor.moveToNext()) {
-                val docId = cursor.getString(0)
-                val name = cursor.getString(1)
-                val mime = cursor.getString(2)
+                val docId = cursor.getString(0) ?: continue
+                val name = cursor.getString(1) ?: continue
+                val mime = cursor.getString(2) ?: continue
                 if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
-                    ids.add(docId to name)
+                    folders.add(docId to name)
                 }
             }
         }
-        return ids
+        return folders  // only top-level folders — same as before, IDs still match
     }
 
+    // full scan — reads everything including durations
     fun scanFolder(rootUri: Uri): List<Audiobook> {
         val rootDocId = DocumentsContract.getTreeDocumentId(rootUri)
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, rootDocId)
-
         val audiobooks = mutableListOf<Audiobook>()
         val rootFiles = mutableListOf<Pair<String, String>>()
 
-        // query root level in one bulk call
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, rootDocId)
+
         context.contentResolver.query(
             childrenUri,
             arrayOf(
@@ -128,64 +136,87 @@ class AudiobookScanner(private val context: Context) {
             null, null, null
         )?.use { cursor ->
             while (cursor.moveToNext()) {
-                val docId = cursor.getString(0)
-                val name = cursor.getString(1)
-                val mime = cursor.getString(2)
+                val docId = cursor.getString(0) ?: continue
+                val name = cursor.getString(1) ?: continue
+                val mime = cursor.getString(2) ?: continue
 
-                if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
-                    val files = queryAudioFilesRaw(rootUri, docId)
-                    if (files.isNotEmpty()) {
-                        audiobooks.add(buildAudiobook(rootUri, name, docId, files))
+                when {
+                    mime == DocumentsContract.Document.MIME_TYPE_DIR -> {
+                        // collect all audio files recursively from this folder
+                        val allFiles = collectAudioFilesRecursively(rootUri, docId)
+                        if (allFiles.isNotEmpty()) {
+                            val contents = scanFolderContents(rootUri, docId)
+                            val chapters = allFiles.mapIndexed { index, (fileDocId, fileName) ->
+                                buildChapter(rootUri, fileDocId, fileName, index)
+                            }
+                            audiobooks.add(
+                                Audiobook(
+                                    id = "${name}_${docId.hashCode()}",
+                                    title = name,
+                                    chapters = chapters,
+                                    coverUri = contents.coverUri
+                                )
+                            )
+                        }
                     }
-                } else if (isAudioFile(name)) {
-                    rootFiles.add(docId to name)
+                    isAudioFile(name) -> rootFiles.add(docId to name)
                 }
             }
         }
 
-        // loose audio files in root = individual audiobooks
         rootFiles.forEach { (docId, name) ->
-            val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
             val title = name.substringBeforeLast(".")
             audiobooks.add(
                 Audiobook(
                     id = "${title}_${docId.hashCode()}",
                     title = title,
-                    chapters = listOf(Chapter(uri = uri.toString(), title = title, index = 0, durationMs = getAudioDuration(uri)))
+                    chapters = listOf(buildChapter(rootUri, docId, name, 0))
                 )
             )
         }
 
+        Log.d("Scanner", "Found ${audiobooks.size} audiobooks")
         return audiobooks.sortedBy { it.title }
     }
 
-    private fun queryAudioFilesRaw(rootUri: Uri, folderDocId: String): List<Pair<String, String>> {
+    // recursively collects all audio files from a folder and its subfolders
+    private fun collectAudioFilesRecursively(
+        rootUri: Uri,
+        folderDocId: String
+    ): List<Pair<String, String>> {
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, folderDocId)
-        val files = mutableListOf<Pair<String, String>>()
+        val audioFiles = mutableListOf<Pair<String, String>>()
+        val subFolders = mutableListOf<String>()
 
         context.contentResolver.query(
             childrenUri,
             arrayOf(
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                 DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE
             ),
             null, null, null
         )?.use { cursor ->
             while (cursor.moveToNext()) {
-                val docId = cursor.getString(0)
-                val name = cursor.getString(1)
-                if (isAudioFile(name)) {
-                    files.add(docId to name)
+                val docId = cursor.getString(0) ?: continue
+                val name = cursor.getString(1) ?: continue
+                val mime = cursor.getString(2) ?: continue
+
+                when {
+                    mime == DocumentsContract.Document.MIME_TYPE_DIR -> subFolders.add(docId)
+                    isAudioFile(name) -> audioFiles.add(docId to name)
                 }
             }
         }
 
-        return files
-            .sortedBy { it.second }
+        // recurse into subfolders (CD1, CD2, etc)
+        subFolders.forEach { subFolderDocId ->
+            audioFiles.addAll(collectAudioFilesRecursively(rootUri, subFolderDocId))
+        }
 
+        return audioFiles.sortedBy { it.second }
     }
 
-    private fun isAudioFile(name: String): Boolean {
-        return name.substringAfterLast(".", "").lowercase() in AUDIO_EXTENSIONS
-    }
+    private fun isAudioFile(name: String): Boolean =
+        name.substringAfterLast(".", "").lowercase() in AUDIO_EXTENSIONS
 }

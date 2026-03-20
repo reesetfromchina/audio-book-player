@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
+    id("com.google.devtools.ksp") version "2.0.21-1.0.28"
+
 }
 
 android {
@@ -40,6 +42,13 @@ android {
 }
 
 dependencies {
+
+    val roomVersion = "2.8.4"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")  // coroutines support
+    ksp("androidx.room:room-compiler:$roomVersion")        // annotation processor
+
+
     // Persistence
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

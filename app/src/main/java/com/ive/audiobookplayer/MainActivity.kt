@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
                 it, Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
             viewModel.setCustomCover(it)
+            //todo fix
         }
     }
     private val viewModel: AudioViewModel by viewModels()
@@ -90,8 +91,8 @@ class MainActivity : ComponentActivity() {
                                 onPickFolder = { folderPickerLauncher.launch(null) },
                                 isLibraryLoaded = libraryState.isLoaded,
                                 isScanning = libraryState.isScanning,
-                                isBackgroundScanning = libraryState.isBackgroundScanning,
                                 libraryGroups = libraryState.libraryGroups,
+                                isInitializing = libraryState.isInitializing
                             )
                         }
                         composable("player") {

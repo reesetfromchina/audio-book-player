@@ -16,14 +16,9 @@ data class PlayerState(
     val showChapterList: Boolean = false,
     val sleepTimerEndTime: Long = 0L,
     val sleepTimerLabel: String = "",
-    val isInitializing: Boolean = true,
     val currentCoverBitmap: Bitmap? = null,
 
-
-
-
 )
-// library later becomes room
 data class LibraryState(
     val audiobooks: List<Audiobook> = emptyList(),
     val bookmarks: Map<String, BookmarkEntry> = emptyMap(),
@@ -31,5 +26,5 @@ data class LibraryState(
     val isLoaded: Boolean = false,
     val isScanning: Boolean = false,
     val isBackgroundScanning: Boolean = false,
-
+    val isInitializing: Boolean = true,
 )
