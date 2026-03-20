@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.media3.session.MediaController
 import com.ive.audiobookplayer.utils.TimeFormatter
 
@@ -22,6 +24,7 @@ fun SeekBarControl(
     controller: MediaController,
     currentPosition: Long,
     duration: Long,
+    playbackSpeed: Float = 1f,
     onPositionChange: (Long) -> Unit
 ) {
     var isSeeking by remember { mutableStateOf(false) }
@@ -29,6 +32,9 @@ fun SeekBarControl(
 
     val displayPosition = if (isSeeking) seekPosition else currentPosition.toFloat()
     val safeDuration = duration.coerceAtLeast(1L).toFloat()
+
+
+    val adjustedDuration = (safeDuration / playbackSpeed).toLong()
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Slider(
@@ -48,8 +54,30 @@ fun SeekBarControl(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(TimeFormatter.formatTime(displayPosition.toLong()))
-            Text(TimeFormatter.formatTime(duration))
+            Text(
+                TimeFormatter.formatTime(displayPosition.toLong()),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (playbackSpeed != 1f) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        TimeFormatter.formatTime(adjustedDuration),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        TimeFormatter.formatTime(duration),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        textDecoration = TextDecoration.LineThrough
+                    )
+                }
+            } else {
+                Text(
+                    TimeFormatter.formatTime(duration),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }

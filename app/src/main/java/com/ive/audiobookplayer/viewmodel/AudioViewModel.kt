@@ -10,7 +10,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
 import com.ive.audiobookplayer.model.Audiobook
-import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.PlayerState
 import com.ive.audiobookplayer.repository.BookmarkRepository
 import com.ive.audiobookplayer.service.AudiobookScanner
@@ -34,13 +33,9 @@ import com.ive.audiobookplayer.model.LibraryState
 import com.ive.audiobookplayer.repository.LibraryRepository
 import com.ive.audiobookplayer.repository.SettingsRepository
 import com.ive.audiobookplayer.utils.calculateProgress
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import kotlin.time.Duration.Companion.milliseconds
 
 class AudioViewModel(application: Application) : AndroidViewModel(application) {
 

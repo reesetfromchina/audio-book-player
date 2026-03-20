@@ -17,6 +17,7 @@ data class PlayerState(
     val sleepTimerEndTime: Long = 0L,
     val sleepTimerLabel: String = "",
     val currentCoverBitmap: Bitmap? = null,
+    val isLoadingBook: Boolean = false,
 
 )
 data class LibraryState(

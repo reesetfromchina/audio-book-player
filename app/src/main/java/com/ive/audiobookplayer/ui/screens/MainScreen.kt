@@ -1,5 +1,6 @@
 package com.ive.audiobookplayer.ui.screens
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -45,14 +47,19 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import com.ive.audiobookplayer.ui.componenets.PlaybackSpeedControl
+import com.ive.audiobookplayer.model.Audiobook
+import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.ui.componenets.PlayerControls
 import com.ive.audiobookplayer.ui.componenets.SeekBarControl
 import com.ive.audiobookplayer.ui.componenets.SleepTimerDialog
+import com.ive.audiobookplayer.ui.componenets.SpeedPickerDialog
+import com.ive.audiobookplayer.utils.calculateTimeRemaining
+import com.ive.audiobookplayer.utils.formatDuration
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 import kotlinx.coroutines.delay
 @Composable
@@ -65,6 +72,7 @@ fun MainScreen(
     val libraryState by viewModel.libraryState.collectAsState()
     val controller = playerState.controller
     var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showSpeedDialog by remember { mutableStateOf(false) }
 
     if (controller == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -73,6 +81,36 @@ fun MainScreen(
         return
     }
 
+    // dialogs
+    if (playerState.showChapterList && playerState.currentAudiobook != null) {
+        ChapterListSheet(
+            audiobook = playerState.currentAudiobook!!,
+            currentChapterIndex = playerState.currentChapterIndex,
+            bookmarks = libraryState.bookmarks,
+            onChapterSelected = { viewModel.jumpToChapter(it) },
+            onDismiss = { viewModel.toggleChapterList() }
+        )
+    }
+    if (showSleepTimerDialog) {
+        SleepTimerDialog(
+            currentLabel = playerState.sleepTimerLabel,
+            onDismiss = { showSleepTimerDialog = false },
+            onTimerSelected = { viewModel.setSleepTimer(it) },
+            onEndChapter = { viewModel.setSleepTimerEndOfChapter() }
+        )
+    }
+    if (showSpeedDialog) {
+        SpeedPickerDialog(
+            currentSpeed = playerState.playbackSpeed,
+            onSpeedSelected = { speed ->
+                controller.setPlaybackSpeed(speed)
+                viewModel.updatePlayerState(playbackSpeed = speed)
+            },
+            onDismiss = { showSpeedDialog = false }
+        )
+    }
+
+    // player listener
     DisposableEffect(controller) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -110,28 +148,9 @@ fun MainScreen(
         }
     }
 
-    if (playerState.showChapterList && playerState.currentAudiobook != null) {
-        ChapterListSheet(
-            audiobook = playerState.currentAudiobook!!,
-            currentChapterIndex = playerState.currentChapterIndex,
-            bookmarks = libraryState.bookmarks,
-            onChapterSelected = { viewModel.jumpToChapter(it) },
-            onDismiss = { viewModel.toggleChapterList() }
-        )
-    }
-
-    if (showSleepTimerDialog) {
-        SleepTimerDialog(
-            currentLabel = playerState.sleepTimerLabel,
-            onDismiss = { showSleepTimerDialog = false },
-            onTimerSelected = { viewModel.setSleepTimer(it) },
-            onEndChapter = { viewModel.setSleepTimerEndOfChapter() }
-        )
-    }
-
-    // cover size adapts to screen height
     val configuration = LocalConfiguration.current
     val coverSize = (configuration.screenHeightDp * 0.28f).dp.coerceIn(140.dp, 260.dp)
+    val bookmark = libraryState.bookmarks[playerState.currentAudiobook?.id]
 
     Column(
         modifier = Modifier
@@ -140,7 +159,7 @@ fun MainScreen(
             .padding(horizontal = 24.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Book title
+        // book title
         Text(
             text = playerState.currentBookTitle.ifEmpty { playerState.currentTitle },
             style = MaterialTheme.typography.titleLarge,
@@ -149,7 +168,7 @@ fun MainScreen(
             overflow = TextOverflow.Ellipsis,
         )
 
-        // chapter info — only shown when relevant
+        // chapter info
         if ((playerState.currentAudiobook?.chapters?.size ?: 0) > 1) {
             Spacer(Modifier.height(2.dp))
             Text(
@@ -164,54 +183,13 @@ fun MainScreen(
 
         Spacer(Modifier.weight(1f))
 
-        // Cover art
-        Box(
-            modifier = Modifier
-                .size(coverSize)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable(enabled = playerState.currentAudiobook != null) { onPickCover() },
-            contentAlignment = Alignment.Center
-        ) {
-            if (playerState.currentCoverBitmap != null) {
-                Image(
-                    bitmap = playerState.currentCoverBitmap!!.asImageBitmap(),
-                    contentDescription = "Cover art",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp)
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Change cover",
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.Done,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Tap to add cover",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
+        // cover art
+        CoverArt(
+            coverBitmap = playerState.currentCoverBitmap,
+            size = coverSize,
+            enabled = playerState.currentAudiobook != null,
+            onPickCover = onPickCover
+        )
 
         Spacer(Modifier.weight(1f))
 
@@ -219,6 +197,7 @@ fun MainScreen(
             controller = controller,
             currentPosition = playerState.currentPosition,
             duration = playerState.duration,
+            playbackSpeed = playerState.playbackSpeed,
             onPositionChange = { viewModel.updatePlayerState(currentPosition = it) }
         )
 
@@ -231,16 +210,19 @@ fun MainScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        PlaybackSpeedControl(
-            controller = controller,
-            currentSpeed = playerState.playbackSpeed,
+        // speed + sleep timer + remaining time
+        PlayerBottomControls(
+            playbackSpeed = playerState.playbackSpeed,
             sleepTimerLabel = playerState.sleepTimerLabel,
+            audiobook = playerState.currentAudiobook,
+            bookmark = bookmark,
+            onSpeedClick = { showSpeedDialog = true },
             onSleepTimerClick = { showSleepTimerDialog = true }
         )
 
         Spacer(Modifier.weight(1f))
 
-        // bottom actions
+        // chapters + library buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -264,6 +246,120 @@ fun MainScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 Text("Library")
+            }
+        }
+    }
+}
+
+// extracted components
+
+@Composable
+private fun CoverArt(
+    coverBitmap: Bitmap?,
+    size: Dp,
+    enabled: Boolean,
+    onPickCover: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(enabled = enabled) { onPickCover() },
+        contentAlignment = Alignment.Center
+    ) {
+        if (coverBitmap != null) {
+            Image(
+                bitmap = coverBitmap.asImageBitmap(),
+                contentDescription = "Cover art",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Change cover",
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Default.Done,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Tap to add cover",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerBottomControls(
+    playbackSpeed: Float,
+    sleepTimerLabel: String,
+    audiobook: Audiobook?,
+    bookmark: BookmarkEntry?,
+    onSpeedClick: () -> Unit,
+    onSleepTimerClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onSpeedClick) {
+                Text(
+                    text = if (playbackSpeed == 1f) "Speed: 1x" else "Speed: ${playbackSpeed}x",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            TextButton(onClick = onSleepTimerClick) {
+                Text(
+                    text = if (sleepTimerLabel.isNotEmpty()) "⏱ $sleepTimerLabel"
+                    else "Sleep timer",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (sleepTimerLabel.isNotEmpty())
+                        MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // remaining time
+        if (audiobook != null) {
+            val remainingMs = calculateTimeRemaining(audiobook as Audiobook, bookmark, playbackSpeed)
+            if (remainingMs > 0) {
+                val text = if (playbackSpeed != 1f) {
+                    val naturalMs = calculateTimeRemaining(audiobook, bookmark, 1f)
+                    "${formatDuration(remainingMs)} remaining · ${formatDuration(naturalMs)} at 1x"
+                } else {
+                    "${formatDuration(remainingMs)} remaining"
+                }
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }

@@ -43,6 +43,9 @@ android {
 
 dependencies {
 
+    implementation(libs.androidx.compose.foundation.layout)
+    implementation(libs.androidx.compose.runtime)
+    implementation(libs.androidx.material3)
     val roomVersion = "2.8.4"
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")  // coroutines support

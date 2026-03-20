@@ -19,3 +19,28 @@ fun calculateProgress(audiobook: Audiobook, bookmark: BookmarkEntry?): Float {
     return (((completedDuration + bookmark.positionMs).toFloat() / totalDuration) * 100f)
         .coerceIn(0f, 100f)
 }
+
+fun calculateTimeRemaining(audiobook: Audiobook, bookmark: BookmarkEntry?, speed: Float) : Long{
+    if (speed <=0f) return 0L
+    val totalDuration = audiobook.chapters.sumOf { it.durationMs }
+    if (totalDuration < 0L) return 0L
+
+    val completedDuration = audiobook.chapters
+        .take(bookmark?.chapterIndex ?: 0)
+        .sumOf { it.durationMs }
+
+    val positionMs = bookmark?.positionMs ?: 0L
+    val remainingMs = totalDuration - completedDuration - positionMs
+
+    return (remainingMs / speed).toLong().coerceAtLeast(0L)
+}
+
+fun formatDuration(ms: Long) : String {
+    val totalSeconds = ms / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    return when{
+        hours > 0 -> "${hours}h ${minutes}m"
+        else -> "${minutes}m"
+    }
+}
