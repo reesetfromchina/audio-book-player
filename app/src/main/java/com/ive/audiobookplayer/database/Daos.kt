@@ -32,6 +32,9 @@ interface AudiobookDao{
 
     @Query("UPDATE audiobooks SET isNew = 0 where id = :id")
     suspend fun markAsNotNew(id: String)
+
+    @Query("SELECT * FROM audiobooks")
+    suspend fun getAllAudiobooksList() : List<AudiobookEntity>
 }
 
 @Dao
@@ -48,4 +51,7 @@ interface BookmarkDao{
 
     @Query("SELECT * FROM bookmarks WHERE audiobookId = :audiobookId")
     suspend fun getSpeed(audiobookId: String) : BookmarkEntity?
+
+    @Query("SELECT * FROM bookmarks")
+    suspend fun getAllBookmarksList() : List<BookmarkEntity>
 }

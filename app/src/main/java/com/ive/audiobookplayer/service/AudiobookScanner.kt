@@ -7,6 +7,11 @@ import android.provider.DocumentsContract
 import android.util.Log
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.Chapter
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 
 class AudiobookScanner(private val context: Context) {
@@ -17,13 +22,11 @@ class AudiobookScanner(private val context: Context) {
         private val COVER_NAMES = setOf("cover", "folder", "front", "artwork")
     }
 
-    // single data class to hold everything found in a folder scan
     private data class FolderContents(
-        val audioFiles: List<Pair<String, String>>,  // docId to name
+        val audioFiles: List<Pair<String, String>>,
         val coverUri: String?
     )
 
-    // scan folder contents in ONE query instead of two separate ones
     private fun scanFolderContents(rootUri: Uri, folderDocId: String): FolderContents {
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, folderDocId)
         val audioFiles = mutableListOf<Pair<String, String>>()
@@ -81,17 +84,35 @@ class AudiobookScanner(private val context: Context) {
         }
     }
 
-    private fun buildChapter(rootUri: Uri, docId: String, name: String, index: Int): Chapter {
-        val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
-        return Chapter(
-            uri = uri.toString(),
-            title = name.substringBeforeLast("."),
-            index = index,
-            durationMs = getAudioDuration(uri)
+    private suspend fun buildAudiobook(
+        rootUri: Uri,
+        folderName: String,
+        folderDocId: String,
+        files: List<Pair<String, String>>
+    ): Audiobook = coroutineScope {
+        // read all chapter durations in parallel
+        val chapters = files.mapIndexed { index, (docId, name) ->
+            async(Dispatchers.IO) {
+                val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
+                Chapter(
+                    uri = uri.toString(),
+                    title = name.substringBeforeLast("."),
+                    index = index,
+                    durationMs = getAudioDuration(uri)
+                )
+            }
+        }.awaitAll()
+
+        val contents = scanFolderContents(rootUri, folderDocId)
+
+        Audiobook(
+            id = "${folderName}_${folderDocId.hashCode()}",
+            title = folderName,
+            chapters = chapters,
+            coverUri = contents.coverUri
         )
     }
 
-    // fast scan — only folder names and IDs, no file opening
     fun scanFolderFast(rootUri: Uri): List<Pair<String, String>> {
         val rootDocId = DocumentsContract.getTreeDocumentId(rootUri)
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, rootDocId)
@@ -115,16 +136,14 @@ class AudiobookScanner(private val context: Context) {
                 }
             }
         }
-        return folders  // only top-level folders — same as before, IDs still match
+        return folders
     }
-
     // full scan — reads everything including durations
-    fun scanFolder(rootUri: Uri): List<Audiobook> {
+    suspend fun scanFolder(rootUri: Uri): List<Audiobook> = coroutineScope {
         val rootDocId = DocumentsContract.getTreeDocumentId(rootUri)
-        val audiobooks = mutableListOf<Audiobook>()
-        val rootFiles = mutableListOf<Pair<String, String>>()
-
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, rootDocId)
+        val audiobookDeferreds = mutableListOf<Deferred<Audiobook?>>()
+        val rootFiles = mutableListOf<Pair<String, String>>()
 
         context.contentResolver.query(
             childrenUri,
@@ -143,40 +162,41 @@ class AudiobookScanner(private val context: Context) {
                 when {
                     mime == DocumentsContract.Document.MIME_TYPE_DIR -> {
                         // collect all audio files recursively from this folder
-                        val allFiles = collectAudioFilesRecursively(rootUri, docId)
-                        if (allFiles.isNotEmpty()) {
-                            val contents = scanFolderContents(rootUri, docId)
-                            val chapters = allFiles.mapIndexed { index, (fileDocId, fileName) ->
-                                buildChapter(rootUri, fileDocId, fileName, index)
-                            }
-                            audiobooks.add(
-                                Audiobook(
-                                    id = "${name}_${docId.hashCode()}",
-                                    title = name,
-                                    chapters = chapters,
-                                    coverUri = contents.coverUri
-                                )
-                            )
-                        }
+                        audiobookDeferreds.add(async(Dispatchers.IO) {
+                            val allFiles = collectAudioFilesRecursively(rootUri, docId)
+                            if (allFiles.isNotEmpty()) {
+                                buildAudiobook(rootUri, name, docId, allFiles)
+                            } else null
+                        })
                     }
                     isAudioFile(name) -> rootFiles.add(docId to name)
                 }
             }
         }
 
-        rootFiles.forEach { (docId, name) ->
-            val title = name.substringBeforeLast(".")
-            audiobooks.add(
+        val audiobooks = audiobookDeferreds.awaitAll().filterNotNull().toMutableList()
+
+        val rootDeferreds = rootFiles.map { (docId, name) ->
+            async(Dispatchers.IO) {
+                val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
+                val title = name.substringBeforeLast(".")
                 Audiobook(
                     id = "${title}_${docId.hashCode()}",
                     title = title,
-                    chapters = listOf(buildChapter(rootUri, docId, name, 0))
+                    chapters = listOf(
+                        Chapter(
+                            uri = uri.toString(),
+                            title = title,
+                            index = 0,
+                            durationMs = getAudioDuration(uri)
+                        )
+                    )
                 )
-            )
+            }
         }
+        audiobooks.addAll(rootDeferreds.awaitAll())
 
-        Log.d("Scanner", "Found ${audiobooks.size} audiobooks")
-        return audiobooks.sortedBy { it.title }
+        audiobooks.sortedBy { it.title }
     }
 
     // recursively collects all audio files from a folder and its subfolders

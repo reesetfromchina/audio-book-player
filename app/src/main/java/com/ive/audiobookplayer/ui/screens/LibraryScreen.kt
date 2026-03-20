@@ -22,11 +22,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -52,7 +53,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryState
@@ -68,6 +68,8 @@ fun LibraryScreen(
     onAudiobookSelected: (Audiobook) -> Unit,
     onPickFolder: () -> Unit,
     library: LibraryState,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
 ) {
     val listState = rememberLazyListState()
 
@@ -94,6 +96,12 @@ fun LibraryScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(onClick = onExportBackup) {
+                Icon(Icons.Default.Upload, contentDescription = "Export backup")
+            }
+            IconButton(onClick = onImportBackup) {
+                Icon(Icons.Default.Download, contentDescription = "Import backup")
+            }
             Text("Library", style = MaterialTheme.typography.headlineSmall)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),

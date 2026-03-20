@@ -28,6 +28,7 @@ import com.ive.audiobookplayer.utils.CoverArtExtractor
 import androidx.core.net.toUri
 import com.ive.audiobookplayer.database.toAudiobook
 import com.ive.audiobookplayer.database.toBookmarkEntry
+import com.ive.audiobookplayer.model.AppBackup
 import com.ive.audiobookplayer.model.LibraryGroups
 import com.ive.audiobookplayer.model.LibraryState
 import com.ive.audiobookplayer.repository.LibraryRepository
@@ -36,6 +37,8 @@ import com.ive.audiobookplayer.utils.calculateProgress
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -223,6 +226,40 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             _playerState.update { it.copy(currentCoverBitmap = bitmap) }
         }
     }
+
+    fun exportBackup(uri: Uri){
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val backup = bookmarkRepository.exportBackup()
+                val json = Json.encodeToString(backup)
+                getApplication<Application>().contentResolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(json.toByteArray())
+                }
+                Log.d("Backup", "Export successful to $uri")
+            }catch (e: Exception) {
+                Log.e("Backup", "Export failed", e)
+            }
+        }
+    }
+
+    fun importBackup(uri: Uri){
+        viewModelScope.launch(Dispatchers.IO){
+            try {
+                val json = getApplication<Application>().contentResolver
+                    .openInputStream(uri)?.use { stream ->
+                        stream.bufferedReader().readText()
+                    } ?: return@launch
+
+                val backup = Json.decodeFromString<AppBackup>(json)
+                val currentAudioBooks = libraryRepository.getAllAudiobookEntities()
+                bookmarkRepository.importBackup(backup, currentAudioBooks)
+                Log.d("Backup", "Import successful — ${backup.bookmarks.size} bookmarks restored")
+            } catch (e: Exception) {
+                Log.e("Backup", "Import failed", e)
+            }
+        }
+    }
+
 
 
     // region Library

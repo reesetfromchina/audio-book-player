@@ -51,6 +51,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val backupExportLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { viewModel.exportBackup(it) }
+    }
+
+    private val backupImportLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let { viewModel.importBackup(it) }
+        }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         navigateToPlayer.value = true
@@ -88,6 +99,8 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onPickFolder = { folderPickerLauncher.launch(null) },
                                 library = libraryState,
+                                onExportBackup = {backupExportLauncher.launch("audiobook_backup.json")},
+                                onImportBackup = { backupImportLauncher.launch(arrayOf("application/json"))}
                             )
                         }
                         composable("player") {
