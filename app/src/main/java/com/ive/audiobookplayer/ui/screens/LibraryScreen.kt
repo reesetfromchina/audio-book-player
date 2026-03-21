@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Button
@@ -112,6 +113,9 @@ fun LibraryScreen(
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp
                     )
+                }
+                IconButton(onClick = { viewModel.rescan() }) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Rescan library")
                 }
                 IconButton(onClick = { viewModel.toggleLibraryView() }) {
                     Icon(

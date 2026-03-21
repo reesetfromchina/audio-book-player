@@ -161,7 +161,7 @@ fun MainScreen(
     ) {
         // book title
         Text(
-            text = playerState.currentBookTitle.ifEmpty { playerState.currentTitle },
+            text = playerState.currentBookTitle.ifEmpty { playerState.chapterTitle },
             style = MaterialTheme.typography.titleLarge,
             textAlign = TextAlign.Center,
             maxLines = 2,
@@ -172,7 +172,7 @@ fun MainScreen(
         if ((playerState.currentAudiobook?.chapters?.size ?: 0) > 1) {
             Spacer(Modifier.height(2.dp))
             Text(
-                text = "Chapter ${playerState.currentChapterIndex + 1} · ${playerState.currentTitle}",
+                text = "Chapter ${playerState.currentChapterIndex + 1} · ${playerState.chapterTitle}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

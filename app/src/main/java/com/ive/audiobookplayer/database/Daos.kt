@@ -35,6 +35,9 @@ interface AudiobookDao{
 
     @Query("SELECT * FROM audiobooks")
     suspend fun getAllAudiobooksList() : List<AudiobookEntity>
+
+    @Query("UPDATE chapters SET durationMs = :durationMs WHERE audiobookId = :audiobookId AND `index` = :chapterIndex")
+    suspend fun updateChapterDuration(audiobookId: String, chapterIndex: Int, durationMs: Long)
 }
 
 @Dao
