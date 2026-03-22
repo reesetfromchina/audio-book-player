@@ -324,13 +324,13 @@ fun LibrarySectionHeader(title: String, count: Int) {
 fun AudiobookCard(
     audiobook: Audiobook,
     bookmark: BookmarkEntry?,
-    coverUri: Uri?,              // ← pass directly
+    coverUri: Uri?,
     isFinished: Boolean = false,
     onClick: () -> Unit
 ) {
     val progress = remember(audiobook, bookmark) { calculateProgress(audiobook, bookmark) }
 
-    // no more produceState or viewModel needed
+
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
