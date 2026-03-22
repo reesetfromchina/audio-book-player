@@ -79,23 +79,38 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         // collect from Room — instant on every reopen
         viewModelScope.launch {
             libraryRepository.audiobooks.collect { audiobooksWithChapters ->
-                val t1 = System.currentTimeMillis()
                 val audiobooks = audiobooksWithChapters.map { it.toAudiobook() }
-                val t2 = System.currentTimeMillis()
 
                 _libraryState.update {
                     it.copy(
                         audiobooks = audiobooks, isInitializing = false
                     )
                 }
-                val t3 = System.currentTimeMillis()
                 updateLibraryGroups()
-                val t4 = System.currentTimeMillis()
                 preloadCoverUris(audiobooks)
-                Log.d(
-                    "Perf",
-                    "mapping=${t2 - t1}ms state=${t3 - t2}ms groups=${t4 - t3}ms total=${t4 - t1}ms"
-                )
+
+
+
+                if (_playerState.value.currentAudiobook == null) {
+                    settingsRepository.getLastBookId()?.let { lastId ->
+                        val lastBook = audiobooks.find { it.id == lastId }
+                        if (lastBook != null) {
+                            val bookmark = withContext(Dispatchers.IO) {
+                                bookmarkRepository.getBookmark(lastId)
+                            }
+                            _playerState.update {
+                                it.copy(
+                                    currentAudiobook = lastBook,
+                                    currentBookTitle = lastBook.title,
+                                    currentChapterIndex = bookmark?.chapterIndex ?: 0,
+                                    currentPosition = bookmark?.positionMs ?: 0L,
+                                    playbackSpeed = bookmark?.playbackSpeed ?: 1f,
+                                )
+                            }
+                            loadCoverArt(lastBook)
+                        }
+                    }
+                }
             }
         }
 
@@ -116,23 +131,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 _libraryState.update { it.copy(isInitializing = false) }
             }
 
-            // restore last opened book
-            settingsRepository.getLastBookId()?.let { lastId ->
-                val lastBook = _libraryState.value.audiobooks.find { it.id == lastId }
-                if (lastBook != null) {
-                    val bookmark = bookmarkRepository.getBookmark(lastId)
-                    _playerState.update {
-                        it.copy(
-                            currentAudiobook = lastBook,
-                            currentBookTitle = lastBook.title,
-                            currentChapterIndex = bookmark?.chapterIndex ?: 0,
-                            currentPosition = bookmark?.positionMs ?: 0L,
-                            playbackSpeed = bookmark?.playbackSpeed ?: 1f,
-                        )
-                    }
-                    loadCoverArt(lastBook)
-                }
-            }
         }
     }
 
@@ -384,6 +382,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                     audiobook.coverUri.toUri(),
                     targetSize = 512
                 )
+
                 else -> coverArtExtractor.extractCover(
                     Uri.parse(audiobook.chapters.first().uri), targetSize = 512
                 )
@@ -471,7 +470,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        if (isPlaying == true){
+        if (isPlaying == true) {
             startPeriodicBookmarkSave()
         }
         if (playbackSpeed != null) {

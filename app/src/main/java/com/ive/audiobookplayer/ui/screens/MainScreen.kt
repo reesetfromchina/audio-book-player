@@ -21,12 +21,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -42,9 +44,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -110,7 +114,6 @@ fun MainScreen(
         )
     }
 
-    // player listener
     DisposableEffect(controller) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -151,34 +154,74 @@ fun MainScreen(
     val configuration = LocalConfiguration.current
     val coverSize = (configuration.screenHeightDp * 0.28f).dp.coerceIn(140.dp, 260.dp)
     val bookmark = libraryState.bookmarks[playerState.currentAudiobook?.id]
+    val hasChapters = (playerState.currentAudiobook?.chapters?.size ?: 0) > 1
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(WindowInsets.safeDrawing.asPaddingValues())
-            .padding(horizontal = 24.dp, vertical = 12.dp),
+            .padding(WindowInsets.safeDrawing.asPaddingValues()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // book title
-        Text(
-            text = playerState.currentBookTitle.ifEmpty { playerState.chapterTitle },
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-
-        // chapter info
-        if ((playerState.currentAudiobook?.chapters?.size ?: 0) > 1) {
-            Spacer(Modifier.height(2.dp))
+        // top bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBackToLibrary) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back to library"
+                )
+            }
             Text(
-                text = "Chapter ${playerState.currentChapterIndex + 1} · ${playerState.chapterTitle}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                "Now Playing",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            IconButton(
+                onClick = { viewModel.toggleChapterList() },
+                enabled = hasChapters
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.List,
+                    contentDescription = "Chapters",
+                    tint = if (hasChapters)
+                        MaterialTheme.colorScheme.onSurface
+                    else
+                        Color.Transparent
+                )
+            }
+        }
+
+        // book title + chapter info
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = playerState.currentBookTitle.ifEmpty { playerState.chapterTitle },
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (hasChapters) {
+                Text(
+                    text = playerState.chapterTitle.ifEmpty {
+                        "Chapter ${playerState.currentChapterIndex + 1}"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         Spacer(Modifier.weight(1f))
@@ -193,22 +236,26 @@ fun MainScreen(
 
         Spacer(Modifier.weight(1f))
 
-        SeekBarControl(
-            controller = controller,
-            currentPosition = playerState.currentPosition,
-            duration = playerState.duration,
-            playbackSpeed = playerState.playbackSpeed,
-            onPositionChange = { viewModel.updatePlayerState(currentPosition = it) }
-        )
+        // seek bar
+        Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+            SeekBarControl(
+                controller = controller,
+                currentPosition = playerState.currentPosition,
+                duration = playerState.duration,
+                playbackSpeed = playerState.playbackSpeed,
+                onPositionChange = { viewModel.updatePlayerState(currentPosition = it) }
+            )
+        }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
 
+        // player controls
         PlayerControls(
             controller = controller,
             isPlaying = playerState.isPlaying,
         )
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
 
         // speed + sleep timer + remaining time
         PlayerBottomControls(
@@ -221,36 +268,8 @@ fun MainScreen(
         )
 
         Spacer(Modifier.weight(1f))
-
-        // chapters + library buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if ((playerState.currentAudiobook?.chapters?.size ?: 0) > 1) {
-                OutlinedButton(
-                    onClick = { viewModel.toggleChapterList() },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.List,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text("Chapters (${playerState.currentAudiobook?.chapters?.size})")
-                }
-            }
-            Button(
-                onClick = onBackToLibrary,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Library")
-            }
-        }
     }
 }
-
 // extracted components
 
 @Composable
