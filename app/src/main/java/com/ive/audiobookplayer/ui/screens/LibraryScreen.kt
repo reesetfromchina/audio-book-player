@@ -1,6 +1,5 @@
 package com.ive.audiobookplayer.ui.screens
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,28 +22,37 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,17 +70,26 @@ import com.ive.audiobookplayer.utils.calculateProgress
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-
 @Composable
 fun LibraryScreen(
     viewModel: AudioViewModel,
+    library: LibraryState,
     onAudiobookSelected: (Audiobook) -> Unit,
     onPickFolder: () -> Unit,
-    library: LibraryState,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
 ) {
     val listState = rememberLazyListState()
+    var searchQuery by remember { mutableStateOf("") }
+    val isSearching = searchQuery.isNotEmpty()
+
+    val filteredBooks = remember(searchQuery, library.audiobooks) {
+        if (isSearching) {
+            library.audiobooks.filter {
+                it.title.contains(searchQuery, ignoreCase = true)
+            }
+        } else emptyList()
+    }
 
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -92,17 +109,12 @@ fun LibraryScreen(
             .padding(WindowInsets.safeDrawing.asPaddingValues())
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
+        // header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onExportBackup) {
-                Icon(Icons.Default.Upload, contentDescription = "Export backup")
-            }
-            IconButton(onClick = onImportBackup) {
-                Icon(Icons.Default.Download, contentDescription = "Import backup")
-            }
             Text("Library", style = MaterialTheme.typography.headlineSmall)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -127,16 +139,71 @@ fun LibraryScreen(
                 IconButton(onClick = onPickFolder) {
                     Icon(Icons.Default.FolderOpen, contentDescription = "Change folder")
                 }
+                // backup menu
+                var showBackupMenu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { showBackupMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                    }
+                    DropdownMenu(
+                        expanded = showBackupMenu,
+                        onDismissRequest = { showBackupMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Export backup") },
+                            onClick = {
+                                showBackupMenu = false
+                                onExportBackup()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Upload, contentDescription = null)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Import backup") },
+                            onClick = {
+                                showBackupMenu = false
+                                onImportBackup()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Download, contentDescription = null)
+                            }
+                        )
+                    }
+                }
             }
         }
 
         Spacer(Modifier.height(8.dp))
 
+        // search bar — always visible when library is loaded
+        if (!library.isInitializing && !library.isScanning && library.audiobooks.isNotEmpty()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                placeholder = { Text("Search books...") },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                },
+                trailingIcon = {
+                    if (isSearching) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
         when {
             library.isInitializing -> {
                 Box(Modifier.fillMaxSize())
             }
-
             library.isScanning -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -146,7 +213,6 @@ fun LibraryScreen(
                     }
                 }
             }
-
             library.audiobooks.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(
@@ -163,7 +229,28 @@ fun LibraryScreen(
                     }
                 }
             }
-
+            isSearching -> {
+                if (filteredBooks.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "No books found for \"$searchQuery\"",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(filteredBooks, key = { it.id }) { book ->
+                            AudiobookCard(
+                                audiobook = book,
+                                bookmark = library.bookmarks[book.id],
+                                viewModel = viewModel,
+                                onClick = { onAudiobookSelected(book) }
+                            )
+                        }
+                    }
+                }
+            }
             library.isGridView -> {
                 val sortedBooks = remember(library.groups) {
                     library.groups.inProgress +
@@ -173,12 +260,11 @@ fun LibraryScreen(
                 AudiobookGrid(
                     audiobooks = sortedBooks,
                     bookmarks = library.bookmarks,
-                    onAudiobookSelected = onAudiobookSelected,
                     viewModel = viewModel,
+                    onAudiobookSelected = onAudiobookSelected,
                     onBooksVisible = { viewModel.onBooksVisible(it) }
                 )
             }
-
             else -> {
                 LazyColumn(
                     state = listState,
@@ -273,12 +359,12 @@ fun AudiobookCard(
     isFinished: Boolean = false,
     onClick: () -> Unit
 ) {
-    val progress = remember(bookmark) { calculateProgress(audiobook, bookmark) }
+    val progress = remember(audiobook, bookmark) { calculateProgress(audiobook, bookmark) }
     val coverBitmap by remember(audiobook.id) {
         viewModel.coverCache.map { it[audiobook.id] }
     }.collectAsState(initial = null)
-
     val imageBitmap = remember(coverBitmap) { coverBitmap?.asImageBitmap() }
+
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -346,7 +432,6 @@ fun AudiobookCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
                 if (bookmark != null) {
                     Spacer(Modifier.height(4.dp))
                     LinearProgressIndicator(
@@ -369,10 +454,7 @@ fun AudiobookCard(
                         val seconds = (bookmark.positionMs / 1000) % 60
                         Text(
                             if (isFinished) "Finished"
-                            else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(
-                                minutes,
-                                seconds
-                            ),
+                            else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(minutes, seconds),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
