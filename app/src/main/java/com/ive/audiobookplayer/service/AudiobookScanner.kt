@@ -5,6 +5,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
+import androidx.core.net.toUri
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.Chapter
 import kotlinx.coroutines.Deferred
@@ -12,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import java.io.File
 
 
 class AudiobookScanner(private val context: Context) {
@@ -84,13 +86,34 @@ class AudiobookScanner(private val context: Context) {
         }
     }
 
+    private fun extractAndSaveEmbeddedCover(context: Context, audioUri: Uri, audiobookId: String): String? {
+        return try {
+            val cacheFile = File(context.cacheDir, "covers/${audiobookId}.jpg")
+            if (cacheFile.exists()) return cacheFile.toUri().toString()
+
+            val retriever = MediaMetadataRetriever()
+            val pfd = context.contentResolver.openFileDescriptor(audioUri, "r") ?: return null
+            pfd.use { retriever.setDataSource(it.fileDescriptor) }
+
+            val art = retriever.embeddedPicture ?: return null
+            retriever.release()
+
+            cacheFile.parentFile?.mkdirs()
+            cacheFile.writeBytes(art)
+
+            cacheFile.toUri().toString()
+        } catch (e: Exception) {
+            Log.e("Scanner", "Failed to extract embedded cover", e)
+            null
+        }
+    }
+
     private suspend fun buildAudiobook(
         rootUri: Uri,
         folderName: String,
         folderDocId: String,
         files: List<Pair<String, String>>
     ): Audiobook = coroutineScope {
-        // read all chapter durations in parallel
         val chapters = files.mapIndexed { index, (docId, name) ->
             async(Dispatchers.IO) {
                 val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
@@ -105,14 +128,23 @@ class AudiobookScanner(private val context: Context) {
 
         val contents = scanFolderContents(rootUri, folderDocId)
 
+        // if no folder cover, try extracting from first audio file
+        val coverUri = contents.coverUri ?: run {
+            val firstUri = DocumentsContract.buildDocumentUriUsingTree(
+                rootUri,
+                files.first().first
+            )
+            val id = "${folderName}_${folderDocId.hashCode()}"
+            extractAndSaveEmbeddedCover(context, firstUri, id)
+        }
+
         Audiobook(
             id = "${folderName}_${folderDocId.hashCode()}",
             title = folderName,
             chapters = chapters,
-            coverUri = contents.coverUri
+            coverUri = coverUri 
         )
     }
-
     fun scanFolderFast(rootUri: Uri): List<Pair<String, String>> {
         val rootDocId = DocumentsContract.getTreeDocumentId(rootUri)
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, rootDocId)

@@ -52,6 +52,10 @@ dependencies {
     ksp("androidx.room:room-compiler:$roomVersion")        // annotation processor
 
 
+    implementation("io.coil-kt:coil-compose:2.7.0")
+//    implementation("io.coil-kt.coil3:coil-network-okhttp:3.4.0")
+
+
     // Persistence
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

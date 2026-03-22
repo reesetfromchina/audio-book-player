@@ -1,7 +1,6 @@
 package com.ive.audiobookplayer.ui.componenets
 
-import android.graphics.Bitmap
-import androidx.compose.foundation.Image
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,46 +25,29 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.utils.calculateProgress
-import com.ive.audiobookplayer.viewmodel.AudioViewModel
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 
 @Composable
 fun AudiobookGrid(
     audiobooks: List<Audiobook>,
     bookmarks: Map<String, BookmarkEntry>,
     onAudiobookSelected: (Audiobook) -> Unit,
-    viewModel: AudioViewModel,
-    onBooksVisible: (List<String>) -> Unit,
+    resolveCover: (Audiobook) -> Uri?,
 ) {
     val gridState = rememberLazyGridState()
-
-    LaunchedEffect(gridState) {
-        snapshotFlow {
-            gridState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String }
-        }
-            .distinctUntilChanged()
-            .collect{
-                visibleIds -> if(visibleIds.isNotEmpty()) onBooksVisible(visibleIds)
-            }
-    }
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -78,7 +60,7 @@ fun AudiobookGrid(
             AudiobookGridCard(
                 audiobook = book,
                 bookmark = bookmarks[book.id],
-                viewModel = viewModel,
+                coverUri = resolveCover(book),
                 onClick = { onAudiobookSelected(book) }
             )
         }
@@ -89,17 +71,13 @@ fun AudiobookGrid(
 fun AudiobookGridCard(
     audiobook: Audiobook,
     bookmark: BookmarkEntry?,
-    viewModel: AudioViewModel,
+    coverUri: Uri?,
     onClick: () -> Unit
 ) {
-    val coverBitmap by remember(audiobook.id) {
-        viewModel.coverCache.map { it[audiobook.id] }
-    }.collectAsState(initial = null)
-
-    val imageBitmap = remember(coverBitmap) { coverBitmap?.asImageBitmap() }
     val progress = remember(audiobook.id, bookmark?.positionMs, bookmark?.chapterIndex) {
         calculateProgress(audiobook, bookmark)
     }
+
     val isFinished = progress >= 95f
 
     Card(
@@ -115,9 +93,12 @@ fun AudiobookGridCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (imageBitmap != null) {
-                    Image(
-                        bitmap = imageBitmap,
+                if (coverUri != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(coverUri)
+                            .crossfade(true)
+                            .build(),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -130,7 +111,6 @@ fun AudiobookGridCard(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
                 }
-
                 if (bookmark != null && progress > 0f && !isFinished) {
                     LinearProgressIndicator(
                         progress = { (progress / 100f).coerceIn(0f, 1f) },
@@ -142,7 +122,6 @@ fun AudiobookGridCard(
                         trackColor = Color.Transparent
                     )
                 }
-
                 if (isFinished) {
                     Box(
                         modifier = Modifier
@@ -159,7 +138,6 @@ fun AudiobookGridCard(
                     }
                 }
             }
-
             Column(
                 modifier = Modifier.padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)

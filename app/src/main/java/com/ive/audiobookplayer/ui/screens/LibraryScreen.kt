@@ -1,6 +1,7 @@
 package com.ive.audiobookplayer.ui.screens
 
-import androidx.compose.foundation.Image
+import android.R
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,31 +46,27 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryState
 import com.ive.audiobookplayer.ui.componenets.AudiobookGrid
 import com.ive.audiobookplayer.utils.calculateProgress
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 @Composable
 fun LibraryScreen(
     viewModel: AudioViewModel,
@@ -83,24 +80,14 @@ fun LibraryScreen(
     var searchQuery by remember { mutableStateOf("") }
     val isSearching = searchQuery.isNotEmpty()
 
-    val filteredBooks = remember(searchQuery, library.audiobooks) {
-        if (isSearching) {
-            library.audiobooks.filter {
-                it.title.contains(searchQuery, ignoreCase = true)
-            }
-        } else emptyList()
+    val resolveCover = remember(viewModel) {
+        { audiobook: Audiobook -> viewModel.resolveCoverUri(audiobook) }
     }
 
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            listState.layoutInfo.visibleItemsInfo
-                .mapNotNull { it.key as? String }
-                .filter { !it.startsWith("header_") && !it.startsWith("spacer_") }
-        }
-            .distinctUntilChanged()
-            .collect { visibleIds ->
-                if (visibleIds.isNotEmpty()) viewModel.onBooksVisible(visibleIds)
-            }
+    val filteredBooks = remember(searchQuery, library.audiobooks) {
+        if (isSearching) library.audiobooks.filter {
+            it.title.contains(searchQuery, ignoreCase = true)
+        } else emptyList()
     }
 
     Column(
@@ -109,7 +96,6 @@ fun LibraryScreen(
             .padding(WindowInsets.safeDrawing.asPaddingValues())
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        // header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -121,10 +107,7 @@ fun LibraryScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (library.isBackgroundScanning) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
-                    )
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 }
                 IconButton(onClick = { viewModel.rescan() }) {
                     Icon(Icons.Default.Refresh, contentDescription = "Rescan library")
@@ -139,7 +122,6 @@ fun LibraryScreen(
                 IconButton(onClick = onPickFolder) {
                     Icon(Icons.Default.FolderOpen, contentDescription = "Change folder")
                 }
-                // backup menu
                 var showBackupMenu by remember { mutableStateOf(false) }
                 Box {
                     IconButton(onClick = { showBackupMenu = true }) {
@@ -151,23 +133,13 @@ fun LibraryScreen(
                     ) {
                         DropdownMenuItem(
                             text = { Text("Export backup") },
-                            onClick = {
-                                showBackupMenu = false
-                                onExportBackup()
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Default.Upload, contentDescription = null)
-                            }
+                            onClick = { showBackupMenu = false; onExportBackup() },
+                            leadingIcon = { Icon(Icons.Default.Upload, null) }
                         )
                         DropdownMenuItem(
                             text = { Text("Import backup") },
-                            onClick = {
-                                showBackupMenu = false
-                                onImportBackup()
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Default.Download, contentDescription = null)
-                            }
+                            onClick = { showBackupMenu = false; onImportBackup() },
+                            leadingIcon = { Icon(Icons.Default.Download, null) }
                         )
                     }
                 }
@@ -176,22 +148,17 @@ fun LibraryScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        // search bar — always visible when library is loaded
         if (!library.isInitializing && !library.isScanning && library.audiobooks.isNotEmpty()) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 placeholder = { Text("Search books...") },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null)
-                },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
                 trailingIcon = {
                     if (isSearching) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            Icon(Icons.Default.Clear, null)
                         }
                     }
                 },
@@ -201,9 +168,8 @@ fun LibraryScreen(
         }
 
         when {
-            library.isInitializing -> {
-                Box(Modifier.fillMaxSize())
-            }
+            library.isInitializing -> Box(Modifier.fillMaxSize())
+
             library.isScanning -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -213,6 +179,7 @@ fun LibraryScreen(
                     }
                 }
             }
+
             library.audiobooks.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(
@@ -229,6 +196,7 @@ fun LibraryScreen(
                     }
                 }
             }
+
             isSearching -> {
                 if (filteredBooks.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -244,13 +212,14 @@ fun LibraryScreen(
                             AudiobookCard(
                                 audiobook = book,
                                 bookmark = library.bookmarks[book.id],
-                                viewModel = viewModel,
+                                coverUri = resolveCover(book),
                                 onClick = { onAudiobookSelected(book) }
                             )
                         }
                     }
                 }
             }
+
             library.isGridView -> {
                 val sortedBooks = remember(library.groups) {
                     library.groups.inProgress +
@@ -260,11 +229,11 @@ fun LibraryScreen(
                 AudiobookGrid(
                     audiobooks = sortedBooks,
                     bookmarks = library.bookmarks,
-                    viewModel = viewModel,
+                    resolveCover = resolveCover,
                     onAudiobookSelected = onAudiobookSelected,
-                    onBooksVisible = { viewModel.onBooksVisible(it) }
                 )
             }
+
             else -> {
                 LazyColumn(
                     state = listState,
@@ -274,21 +243,21 @@ fun LibraryScreen(
                         title = "In Progress",
                         books = library.groups.inProgress,
                         bookmarks = library.bookmarks,
-                        viewModel = viewModel,
+                        resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
                     )
                     librarySection(
                         title = "Unplayed",
                         books = library.groups.unplayed,
                         bookmarks = library.bookmarks,
-                        viewModel = viewModel,
+                        resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
                     )
                     librarySection(
                         title = "Finished",
                         books = library.groups.finished,
                         bookmarks = library.bookmarks,
-                        viewModel = viewModel,
+                        resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
                         isFinished = true,
                     )
@@ -302,7 +271,7 @@ private fun LazyListScope.librarySection(
     title: String,
     books: List<Audiobook>,
     bookmarks: Map<String, BookmarkEntry>,
-    viewModel: AudioViewModel,
+    resolveCover: (Audiobook) -> Uri?,
     onAudiobookSelected: (Audiobook) -> Unit,
     isFinished: Boolean = false,
 ) {
@@ -316,8 +285,8 @@ private fun LazyListScope.librarySection(
         AudiobookCard(
             audiobook = book,
             bookmark = bookmarks[book.id],
+            coverUri = resolveCover(book),
             isFinished = isFinished,
-            viewModel = viewModel,
             onClick = { onAudiobookSelected(book) }
         )
     }
@@ -355,16 +324,13 @@ fun LibrarySectionHeader(title: String, count: Int) {
 fun AudiobookCard(
     audiobook: Audiobook,
     bookmark: BookmarkEntry?,
-    viewModel: AudioViewModel,
+    coverUri: Uri?,              // ← pass directly
     isFinished: Boolean = false,
     onClick: () -> Unit
 ) {
     val progress = remember(audiobook, bookmark) { calculateProgress(audiobook, bookmark) }
-    val coverBitmap by remember(audiobook.id) {
-        viewModel.coverCache.map { it[audiobook.id] }
-    }.collectAsState(initial = null)
-    val imageBitmap = remember(coverBitmap) { coverBitmap?.asImageBitmap() }
 
+    // no more produceState or viewModel needed
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -387,9 +353,12 @@ fun AudiobookCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (imageBitmap != null) {
-                    Image(
-                        bitmap = imageBitmap,
+                if (coverUri != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(coverUri)
+                            .crossfade(true)
+                            .build(),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -454,7 +423,9 @@ fun AudiobookCard(
                         val seconds = (bookmark.positionMs / 1000) % 60
                         Text(
                             if (isFinished) "Finished"
-                            else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(minutes, seconds),
+                            else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(
+                                minutes, seconds
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

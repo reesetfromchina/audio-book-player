@@ -1,19 +1,13 @@
 package com.ive.audiobookplayer.repository
 
 import android.content.Context
-import android.net.Uri
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import com.ive.audiobookplayer.database.AppDatabase
 import com.ive.audiobookplayer.database.AudiobookEntity
 import com.ive.audiobookplayer.database.BookmarkEntity
 import com.ive.audiobookplayer.model.AppBackup
-import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkBackup
 import com.ive.audiobookplayer.model.BookmarkEntry
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class BookmarkRepository(context: Context) {
@@ -52,13 +46,15 @@ class BookmarkRepository(context: Context) {
         )
     }
 
-    suspend fun exportBackup(): AppBackup{
+    suspend fun getAllBookmarksList(): List<BookmarkEntity> = bookmarkDao.getAllBookmarksList()
+
+    suspend fun exportBackup(): AppBackup {
         val allBookmarks = bookmarkDao.getAllBookmarksList()
         val allAudiobooks = audiobookDao.getAllAudiobooksList()
 
         return AppBackup(
-            bookmarks = allBookmarks.map{ bookmark ->
-                val title = allAudiobooks.find {it.id == bookmark.audiobookId}?.title ?: ""
+            bookmarks = allBookmarks.map { bookmark ->
+                val title = allAudiobooks.find { it.id == bookmark.audiobookId }?.title ?: ""
                 BookmarkBackup(
                     bookTitle = title,
                     audiobookId = bookmark.audiobookId,
@@ -73,13 +69,12 @@ class BookmarkRepository(context: Context) {
 
     suspend fun importBackup(backup: AppBackup, currentAudiobooks: List<AudiobookEntity>) {
         backup.bookmarks.forEach { bookmarkBackup ->
-            // try to match by id first, then fall back to title
-            val matchedId = when{
-                currentAudiobooks.any { it.id == bookmarkBackup.audiobookId} ->
+            val matchedId = when {
+                currentAudiobooks.any { it.id == bookmarkBackup.audiobookId } ->
                     bookmarkBackup.audiobookId
                 else ->
                     currentAudiobooks.find { it.title == bookmarkBackup.bookTitle }?.id
-            } ?: bookmarkBackup.audiobookId // store anyway even if book not found
+            } ?: bookmarkBackup.audiobookId
 
             bookmarkDao.saveBookmark(
                 BookmarkEntity(

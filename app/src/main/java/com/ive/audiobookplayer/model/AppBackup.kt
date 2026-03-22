@@ -16,4 +16,5 @@ data class BookmarkBackup(
     val positionMS: Long,
     val playbackSpeed: Float,
     val lastPlayedAt: Long,
+    val customCoverBase64: String? = null
 )
