@@ -48,8 +48,9 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepository = SettingsRepository(application)
     private val bookmarkRepository = BookmarkRepository(application)
     private val libraryRepository = LibraryRepository(application)
-    private val audiobookScanner = AudiobookScanner(application)
     private val coverArtRepository = CoverArtRepository(application)
+
+    private val audiobookScanner = AudiobookScanner(application)
     private val coverArtExtractor = CoverArtExtractor(application)
 
     private val _playerState = MutableStateFlow(PlayerState())
@@ -342,37 +343,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         return resolvedCoverUris[audiobook.id]
     }
 
-    private suspend fun extractAndCacheEmbeddedCover(audiobook: Audiobook): Uri? =
-        withContext(Dispatchers.IO) {
-            try {
-                // check if already extracted
-
-                val cacheFile = File(
-                    getApplication<Application>().cacheDir,
-                    "covers/${audiobook.id}.jpg"
-                )
-                if (cacheFile.exists()) return@withContext cacheFile.toUri()
-
-                // extract from audio file
-                val bitmap = coverArtExtractor.extractCover(
-                    Uri.parse(audiobook.chapters.first().uri),
-                    targetSize = 512,
-                ) ?: return@withContext null
-
-                // save to disk
-                cacheFile.parentFile?.mkdirs()
-                cacheFile.outputStream().use { out ->
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-                }
-                bitmap.recycle()
-
-                cacheFile.toUri()
-            } catch (e: Exception) {
-                Log.e("Cover", "Failed to extract embedded cover for ${audiobook.title}", e)
-                null
-            }
-        }
-
     private fun loadCoverArt(audiobook: Audiobook) {
         viewModelScope.launch(Dispatchers.IO) {
             val customUri = coverArtRepository.getCoverUri(audiobook.id)
@@ -610,14 +580,28 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun decodeBitmapFromUri(uri: Uri, targetSize: Int = 128): Bitmap? {
         return try {
+            val contentResolver = getApplication<Application>().contentResolver
+
+            // get dimensions
             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            getApplication<Application>().contentResolver.openInputStream(uri)?.use { stream ->
+            contentResolver.openInputStream(uri)?.use { stream ->
                 BitmapFactory.decodeStream(stream, null, options)
             }
-            options.inSampleSize =
-                calculateSampleSize(options.outWidth, options.outHeight, targetSize)
+
+            // early exit if image is already small
+            if (options.outWidth <= targetSize && options.outHeight <= targetSize) {
+                options.inSampleSize = 1
+            } else {
+                options.inSampleSize = calculateSampleSize(
+                    options.outHeight,
+                    options.outHeight,
+                    targetSize
+                )
+            }
+
+            // load sampled image
             options.inJustDecodeBounds = false
-            getApplication<Application>().contentResolver.openInputStream(uri)?.use { stream ->
+            contentResolver.openInputStream(uri)?.use { stream ->
                 BitmapFactory.decodeStream(stream, null, options)
             }
         } catch (e: Exception) {

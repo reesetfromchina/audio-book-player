@@ -48,9 +48,9 @@ class AudiobookScanner(private val context: Context) {
                 val name = cursor.getString(1) ?: continue
                 val ext = name.substringAfterLast(".", "").lowercase()
 
-                when {
-                    ext in AUDIO_EXTENSIONS -> audioFiles.add(docId to name)
-                    ext in IMAGE_EXTENSIONS -> {
+                when (ext) {
+                    in AUDIO_EXTENSIONS -> audioFiles.add(docId to name)
+                    in IMAGE_EXTENSIONS -> {
                         val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId).toString()
                         val nameWithoutExt = name.substringBeforeLast(".").lowercase()
                         if (nameWithoutExt in COVER_NAMES) {
@@ -108,12 +108,7 @@ class AudiobookScanner(private val context: Context) {
         }
     }
 
-    private suspend fun buildAudiobook(
-        rootUri: Uri,
-        folderName: String,
-        folderDocId: String,
-        files: List<Pair<String, String>>
-    ): Audiobook = coroutineScope {
+    private suspend fun buildAudiobook(rootUri: Uri, folderName: String, folderDocId: String, files: List<Pair<String, String>>): Audiobook = coroutineScope {
         val chapters = files.mapIndexed { index, (docId, name) ->
             async(Dispatchers.IO) {
                 val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
@@ -142,7 +137,7 @@ class AudiobookScanner(private val context: Context) {
             id = "${folderName}_${folderDocId.hashCode()}",
             title = folderName,
             chapters = chapters,
-            coverUri = coverUri 
+            coverUri = coverUri
         )
     }
     fun scanFolderFast(rootUri: Uri): List<Pair<String, String>> {
@@ -174,7 +169,7 @@ class AudiobookScanner(private val context: Context) {
     suspend fun scanFolder(rootUri: Uri): List<Audiobook> = coroutineScope {
         val rootDocId = DocumentsContract.getTreeDocumentId(rootUri)
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, rootDocId)
-        val audiobookDeferreds = mutableListOf<Deferred<Audiobook?>>()
+        val audiobookDeferred = mutableListOf<Deferred<Audiobook?>>()
         val rootFiles = mutableListOf<Pair<String, String>>()
 
         context.contentResolver.query(
@@ -194,7 +189,7 @@ class AudiobookScanner(private val context: Context) {
                 when {
                     mime == DocumentsContract.Document.MIME_TYPE_DIR -> {
                         // collect all audio files recursively from this folder
-                        audiobookDeferreds.add(async(Dispatchers.IO) {
+                        audiobookDeferred.add(async(Dispatchers.IO) {
                             val allFiles = collectAudioFilesRecursively(rootUri, docId)
                             if (allFiles.isNotEmpty()) {
                                 buildAudiobook(rootUri, name, docId, allFiles)
@@ -206,9 +201,9 @@ class AudiobookScanner(private val context: Context) {
             }
         }
 
-        val audiobooks = audiobookDeferreds.awaitAll().filterNotNull().toMutableList()
+        val audiobooks = audiobookDeferred.awaitAll().filterNotNull().toMutableList()
 
-        val rootDeferreds = rootFiles.map { (docId, name) ->
+        val rootDeferred = rootFiles.map { (docId, name) ->
             async(Dispatchers.IO) {
                 val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
                 val title = name.substringBeforeLast(".")
@@ -226,7 +221,7 @@ class AudiobookScanner(private val context: Context) {
                 )
             }
         }
-        audiobooks.addAll(rootDeferreds.awaitAll())
+        audiobooks.addAll(rootDeferred.awaitAll())
 
         audiobooks.sortedBy { it.title }
     }
