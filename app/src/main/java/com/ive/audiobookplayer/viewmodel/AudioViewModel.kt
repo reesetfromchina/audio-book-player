@@ -28,8 +28,10 @@ import com.ive.audiobookplayer.repository.CoverArtRepository
 import com.ive.audiobookplayer.utils.CoverArtExtractor
 import androidx.core.net.toUri
 import com.ive.audiobookplayer.database.toAudiobook
+import com.ive.audiobookplayer.database.toBookmarkEntry
 import com.ive.audiobookplayer.model.AppBackup
 import com.ive.audiobookplayer.model.BookmarkBackup
+import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryGroups
 import com.ive.audiobookplayer.model.LibraryState
 import com.ive.audiobookplayer.repository.LibraryRepository
@@ -361,21 +363,28 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // region playback
     private var isSwitchingBooks = false
 
+    fun isFinished(audiobook: Audiobook, bookmark: BookmarkEntry? ) : Boolean{
+        return if (calculateProgress(audiobook,bookmark) >= 95f){
+            true
+        } else{
+            false
+        }
+    }
     @OptIn(UnstableApi::class)
     fun playAudiobook(audiobook: Audiobook) {
+
         viewModelScope.launch {
+
             isSwitchingBooks = true
             bookmarkSaveJob?.cancel()
-            saveCurrentPosition()
-
+            Log.d("playAudiobook", "viewModel_playAudiobook")
+            Log.d("playAudiobook", "isSwitching: ${isSwitchingBooks}}")
+            Log.d("playAudiobook", "Audiobook title?: ${audiobook.title}}")
             val bookmark = withContext(Dispatchers.IO) {
                 bookmarkRepository.getBookmark(audiobook.id)
             }
-
-            val speed = bookmark?.playbackSpeed ?: 1f
             val customCoverUri = withContext(Dispatchers.IO) {
                 coverArtRepository.getCoverUri(audiobook.id)
             }
@@ -385,29 +394,65 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 audiobook.coverUri != null -> audiobook.coverUri.toUri()
                 else -> null
             }
-
-            controllerManager.playAudiobook(
-                audiobook,
-                startChapterIndex = bookmark?.chapterIndex ?: 0,
-                startPositionMs = bookmark?.positionMs ?: 0L,
-                coverUri
-            )
-            _playerState.value.controller?.setPlaybackSpeed(speed)
-
-            _playerState.update {
-                it.copy(
-                    currentAudiobook = audiobook,
-                    currentBookTitle = audiobook.title,
-                    currentChapterIndex = bookmark?.chapterIndex ?: 0,
-                    currentPosition = bookmark?.positionMs ?: 0L,
-                    playbackSpeed = speed,
+            if (isFinished(audiobook, bookmark?.toBookmarkEntry())) {
+                controllerManager.playAudiobook(
+                    audiobook,
+                    startChapterIndex = 0,
+                    startPositionMs = 0L,
+                    coverUri
                 )
-            }
+                _playerState.value.controller?.setPlaybackSpeed(1f)
 
-            settingsRepository.saveLastBookId(audiobook.id)
-            loadCoverArt(audiobook)
-            startPeriodicBookmarkSave()
-            isSwitchingBooks = false
+
+                // maybe here is problem..
+                _playerState.update {
+                    it.copy(
+                        currentAudiobook = audiobook,
+                        currentBookTitle = audiobook.title,
+                        currentChapterIndex = bookmark?.chapterIndex ?: 0,
+                        currentPosition = bookmark?.positionMs ?: 0L,
+                        playbackSpeed = 1f,
+                    )
+                }
+                // todo fix this too somehow
+//                settingsRepository.saveLastBookId(audiobook.id)
+                loadCoverArt(audiobook)
+                startPeriodicBookmarkSave()
+                isSwitchingBooks = false
+
+            } else {
+
+
+                val speed = bookmark?.playbackSpeed ?: 1f
+
+
+                controllerManager.playAudiobook(
+                    audiobook,
+                    startChapterIndex = bookmark?.chapterIndex ?: 0,
+                    startPositionMs = bookmark?.positionMs ?: 0L,
+                    coverUri
+                )
+                _playerState.value.controller?.setPlaybackSpeed(speed)
+
+
+                // maybe here is problem..
+                _playerState.update {
+                    it.copy(
+                        currentAudiobook = audiobook,
+                        currentBookTitle = audiobook.title,
+                        currentChapterIndex = bookmark?.chapterIndex ?: 0,
+                        currentPosition = bookmark?.positionMs ?: 0L,
+                        playbackSpeed = speed,
+                    )
+                }
+
+//                settingsRepository.saveLastBookId(audiobook.id)
+//                saveCurrentPosition()
+
+                loadCoverArt(audiobook)
+                startPeriodicBookmarkSave()
+                isSwitchingBooks = false
+            }
         }
     }
 
