@@ -1,12 +1,18 @@
 package com.ive.audiobookplayer.viewmodel
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.util.Base64
 import android.util.Log
 import androidx.annotation.OptIn
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
@@ -27,6 +33,7 @@ import kotlinx.coroutines.launch
 import com.ive.audiobookplayer.repository.CoverArtRepository
 import com.ive.audiobookplayer.utils.CoverArtExtractor
 import androidx.core.net.toUri
+import com.ive.audiobookplayer.utils.SleepTimerState
 import com.ive.audiobookplayer.database.toAudiobook
 import com.ive.audiobookplayer.database.toBookmarkEntry
 import com.ive.audiobookplayer.model.AppBackup
@@ -64,8 +71,32 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private var bookmarkSaveJob: Job? = null
     private var sleepTimerJob: Job? = null
-
+    private val sleepTimerReceiver = object : BroadcastReceiver(){
+        override fun onReceive(context: Context, intent : Intent){
+            if (intent.action == "audiobookplayer.SLEEP_TIMER_FIRED"){
+                _playerState.update {
+                    it.copy(sleepTimerEndTime = 0L, sleepTimerLabel = "")
+                }
+            }
+        }
+    }
     init {
+
+        // register receiver
+        val filter = IntentFilter("audiobookplayer.SLEEP_TIMER_FIRED")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getApplication<Application>().registerReceiver(
+                sleepTimerReceiver, filter, Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            ContextCompat.registerReceiver(
+                getApplication<Application>(),
+                sleepTimerReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        }
+
         viewModelScope.launch {
             controllerManager.controller.collect { controller ->
                 _playerState.update { it.copy(controller = controller) }
@@ -121,12 +152,9 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             settingsRepository.rootFolderUri.first()?.let { uriString ->
                 val uri = uriString.toUri()
                 val cachedIds = libraryRepository.getAllIds()
-                Log.d("Init", "Room has ${cachedIds.size} books")
                 if (cachedIds.isEmpty()) {
-                    Log.d("Init", "No books in Room → full scan")
                     scanLibrary(uri)
                 } else {
-                    Log.d("Init", "Books found → background rescan")
                     backgroundRescan(uri)
                 }
             } ?: run {
@@ -202,9 +230,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 getApplication<Application>().contentResolver.openOutputStream(uri)?.use { stream ->
                     stream.write(json.toByteArray())
                 }
-                Log.d("Backup", "Export successful to $uri")
             } catch (e: Exception) {
-                Log.e("Backup", "Export failed", e)
             }
         }
     }
@@ -363,7 +389,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private var isSwitchingBooks = false
 
     fun isFinished(audiobook: Audiobook, bookmark: BookmarkEntry? ) : Boolean{
         return if (calculateProgress(audiobook,bookmark) >= 95f){
@@ -372,85 +397,56 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             false
         }
     }
+    private var isSwitchingBooks = false
     @OptIn(UnstableApi::class)
     fun playAudiobook(audiobook: Audiobook) {
-
         viewModelScope.launch {
-
             isSwitchingBooks = true
             bookmarkSaveJob?.cancel()
-            Log.d("playAudiobook", "viewModel_playAudiobook")
-            Log.d("playAudiobook", "isSwitching: ${isSwitchingBooks}}")
-            Log.d("playAudiobook", "Audiobook title?: ${audiobook.title}}")
-            val bookmark = withContext(Dispatchers.IO) {
-                bookmarkRepository.getBookmark(audiobook.id)
-            }
-            val customCoverUri = withContext(Dispatchers.IO) {
-                coverArtRepository.getCoverUri(audiobook.id)
-            }
 
-            val coverUri = when {
-                customCoverUri != null -> Uri.parse(customCoverUri)
-                audiobook.coverUri != null -> audiobook.coverUri.toUri()
-                else -> null
-            }
-            if (isFinished(audiobook, bookmark?.toBookmarkEntry())) {
-                controllerManager.playAudiobook(
-                    audiobook,
-                    startChapterIndex = 0,
-                    startPositionMs = 0L,
-                    coverUri
-                )
-                _playerState.value.controller?.setPlaybackSpeed(1f)
-
-
-                // maybe here is problem..
-                _playerState.update {
-                    it.copy(
-                        currentAudiobook = audiobook,
-                        currentBookTitle = audiobook.title,
-                        currentChapterIndex = bookmark?.chapterIndex ?: 0,
-                        currentPosition = bookmark?.positionMs ?: 0L,
-                        playbackSpeed = 1f,
-                    )
+            try {
+                val bookmark = withContext(Dispatchers.IO) {
+                    bookmarkRepository.getBookmark(audiobook.id)
                 }
-                // todo fix this too somehow
-//                settingsRepository.saveLastBookId(audiobook.id)
-                loadCoverArt(audiobook)
-                startPeriodicBookmarkSave()
-                isSwitchingBooks = false
+                val customCoverUri = withContext(Dispatchers.IO) {
+                    coverArtRepository.getCoverUri(audiobook.id)
+                }
 
-            } else {
+                val coverUri = when {
+                    customCoverUri != null -> Uri.parse(customCoverUri)
+                    audiobook.coverUri != null -> audiobook.coverUri.toUri()
+                    else -> null
+                }
 
+                val isFinished = isFinished(audiobook, bookmark?.toBookmarkEntry())
 
-                val speed = bookmark?.playbackSpeed ?: 1f
-
+                val startChapter = if (isFinished) 0 else (bookmark?.chapterIndex ?: 0)
+                val startPosition = if (isFinished) 0L else (bookmark?.positionMs ?: 0L)
+                val speed = if (isFinished) 1f else (bookmark?.playbackSpeed ?: 1f)
 
                 controllerManager.playAudiobook(
                     audiobook,
-                    startChapterIndex = bookmark?.chapterIndex ?: 0,
-                    startPositionMs = bookmark?.positionMs ?: 0L,
+                    startChapterIndex = startChapter,
+                    startPositionMs = startPosition,
                     coverUri
                 )
+
+                settingsRepository.saveLastBookId(audiobook.id)
                 _playerState.value.controller?.setPlaybackSpeed(speed)
-
-
-                // maybe here is problem..
                 _playerState.update {
                     it.copy(
                         currentAudiobook = audiobook,
                         currentBookTitle = audiobook.title,
-                        currentChapterIndex = bookmark?.chapterIndex ?: 0,
-                        currentPosition = bookmark?.positionMs ?: 0L,
+                        currentChapterIndex = startChapter,
+                        currentPosition = startPosition,
                         playbackSpeed = speed,
                     )
                 }
 
-//                settingsRepository.saveLastBookId(audiobook.id)
-//                saveCurrentPosition()
-
                 loadCoverArt(audiobook)
+                delay(1000)
                 startPeriodicBookmarkSave()
+            } finally {
                 isSwitchingBooks = false
             }
         }
@@ -486,7 +482,10 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (isPlaying == true) {
-            startPeriodicBookmarkSave()
+            viewModelScope.launch {
+                delay(1000)
+                startPeriodicBookmarkSave()
+            }
         }
         if (playbackSpeed != null) {
             viewModelScope.launch { saveCurrentPosition() }
@@ -529,14 +528,17 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun saveCurrentPosition() {
         val state = _playerState.value
-        val audiobook = state.currentAudiobook ?: run {
+        val controller = state.controller ?: return
+
+        if (isSwitchingBooks) {
             return
         }
-        val controller = state.controller ?: run {
-            return
-        }
+
+        val audiobook = state.currentAudiobook ?: return
+
         val position = controller.currentPosition.coerceAtLeast(0L)
         val chapterIndex = controller.currentMediaItemIndex
+
         bookmarkRepository.saveBookmark(
             audiobookId = audiobook.id,
             chapterIndex = chapterIndex,
@@ -560,6 +562,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSleepTimer(minutes: Int?) {
         sleepTimerJob?.cancel()
+        SleepTimerState.endOfChapterEnabled.set(false)
         if (minutes == null) {
             _playerState.update { it.copy(sleepTimerEndTime = 0L, sleepTimerLabel = "") }
             return
@@ -586,6 +589,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSleepTimerEndOfChapter() {
         sleepTimerJob?.cancel()
+        SleepTimerState.endOfChapterEnabled.set(true)
         _playerState.update { it.copy(sleepTimerEndTime = -1L, sleepTimerLabel = "End of chapter") }
     }
 
@@ -665,6 +669,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        getApplication<Application>().unregisterReceiver(sleepTimerReceiver)
         runBlocking { saveCurrentPosition() }
         viewModelScope.launch { controllerManager.release() }
     }

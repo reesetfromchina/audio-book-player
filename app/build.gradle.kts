@@ -23,6 +23,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -48,8 +49,8 @@ dependencies {
     implementation(libs.androidx.material3)
     val roomVersion = "2.8.4"
     implementation("androidx.room:room-runtime:$roomVersion")
-    implementation("androidx.room:room-ktx:$roomVersion")  // coroutines support
-    ksp("androidx.room:room-compiler:$roomVersion")        // annotation processor
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
 
 
     implementation("io.coil-kt:coil-compose:2.7.0")

@@ -1,9 +1,6 @@
 package com.ive.audiobookplayer.ui.screens
 
-import android.graphics.Bitmap
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,22 +14,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Done
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -43,27 +36,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import com.ive.audiobookplayer.model.Audiobook
-import com.ive.audiobookplayer.model.BookmarkEntry
+import com.ive.audiobookplayer.ui.componenets.CoverArt
+import com.ive.audiobookplayer.ui.componenets.PlayerBottomControls
 import com.ive.audiobookplayer.ui.componenets.PlayerControls
 import com.ive.audiobookplayer.ui.componenets.SeekBarControl
 import com.ive.audiobookplayer.ui.componenets.SleepTimerDialog
 import com.ive.audiobookplayer.ui.componenets.SpeedPickerDialog
-import com.ive.audiobookplayer.utils.calculateTimeRemaining
-import com.ive.audiobookplayer.utils.formatDuration
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 import kotlinx.coroutines.delay
 @Composable
@@ -77,7 +64,6 @@ fun MainScreen(
     val controller = playerState.controller
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
-
     if (controller == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -125,10 +111,7 @@ fun MainScreen(
                     duration = controller.duration.coerceAtLeast(0L),
                     currentChapterIndex = controller.currentMediaItemIndex,
                 )
-                if (playerState.sleepTimerEndTime == -1L) {
-                    controller.pause()
-                    viewModel.setSleepTimer(null)
-                }
+
             }
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
                 viewModel.updatePlayerState(playbackSpeed = playbackParameters.speed)
@@ -145,241 +128,159 @@ fun MainScreen(
     }
 
     LaunchedEffect(playerState.isPlaying) {
-        while (playerState.isPlaying) {
+        while (true) {
+            if (!playerState.isPlaying) break
             viewModel.updatePlayerState(currentPosition = controller.currentPosition)
             delay(500)
         }
     }
 
     val configuration = LocalConfiguration.current
-    val coverSize = (configuration.screenHeightDp * 0.28f).dp.coerceIn(140.dp, 260.dp)
+    val coverSize = (configuration.screenHeightDp * 0.38f).dp.coerceIn(140.dp, 260.dp)
     val bookmark = libraryState.bookmarks[playerState.currentAudiobook?.id]
     val hasChapters = (playerState.currentAudiobook?.chapters?.size ?: 0) > 1
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(WindowInsets.safeDrawing.asPaddingValues()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // top bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBackToLibrary) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back to library"
-                )
-            }
-            Text(
-                "Now Playing",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            IconButton(
-                onClick = { viewModel.toggleChapterList() },
-                enabled = hasChapters
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.List,
-                    contentDescription = "Chapters",
-                    tint = if (hasChapters)
-                        MaterialTheme.colorScheme.onSurface
-                    else
-                        Color.Transparent
-                )
-            }
+    if (libraryState.isInitializing) {
+        Log.d("MainScreen", " Audiobook is initializing")
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
         }
 
-        // book title + chapter info
+        return
+    }
+
+    val audiobook = playerState.currentAudiobook
+
+    if (audiobook != null) {
         Column(
-            modifier = Modifier.padding(horizontal = 24.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(WindowInsets.safeDrawing.asPaddingValues()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
+            Spacer(Modifier.height(8.dp))
+
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Text(
+                    "Now Playing",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
             Text(
                 text = playerState.currentBookTitle.ifEmpty { playerState.chapterTitle },
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.Bold
             )
+
             if (hasChapters) {
+                Spacer(Modifier.height(4.dp))
                 Text(
                     text = playerState.chapterTitle.ifEmpty {
                         "Chapter ${playerState.currentChapterIndex + 1}"
                     },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
 
-        Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(48.dp))
 
-        // cover art
-        CoverArt(
-            coverBitmap = playerState.currentCoverBitmap,
-            size = coverSize,
-            enabled = playerState.currentAudiobook != null,
-            onPickCover = onPickCover
-        )
-
-        Spacer(Modifier.weight(1f))
-
-        // seek bar
-        Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            SeekBarControl(
-                controller = controller,
-                currentPosition = playerState.currentPosition,
-                duration = playerState.duration,
-                playbackSpeed = playerState.playbackSpeed,
-                onPositionChange = { viewModel.updatePlayerState(currentPosition = it) }
-            )
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        // player controls
-        PlayerControls(
-            controller = controller,
-            isPlaying = playerState.isPlaying,
-        )
-
-        Spacer(Modifier.height(4.dp))
-
-        // speed + sleep timer + remaining time
-        PlayerBottomControls(
-            playbackSpeed = playerState.playbackSpeed,
-            sleepTimerLabel = playerState.sleepTimerLabel,
-            audiobook = playerState.currentAudiobook,
-            bookmark = bookmark,
-            onSpeedClick = { showSpeedDialog = true },
-            onSleepTimerClick = { showSleepTimerDialog = true }
-        )
-
-        Spacer(Modifier.weight(1f))
-    }
-}
-// extracted components
-
-@Composable
-private fun CoverArt(
-    coverBitmap: Bitmap?,
-    size: Dp,
-    enabled: Boolean,
-    onPickCover: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(enabled = enabled) { onPickCover() },
-        contentAlignment = Alignment.Center
-    ) {
-        if (coverBitmap != null) {
-            Image(
-                bitmap = coverBitmap.asImageBitmap(),
-                contentDescription = "Cover art",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
+            // cover art
+            Card(
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(8.dp)
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
-                contentAlignment = Alignment.Center
+                    .size(coverSize)
+                    .shadow(8.dp, shape = RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = "Change cover",
-                    modifier = Modifier.size(14.dp)
+                CoverArt(
+                    coverBitmap = playerState.currentCoverBitmap,
+                    size = coverSize,
+                    enabled = playerState.currentAudiobook != null,
+                    onPickCover = onPickCover
                 )
             }
-        } else {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Default.Done,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Tap to add cover",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
 
-@Composable
-private fun PlayerBottomControls(
-    playbackSpeed: Float,
-    sleepTimerLabel: String,
-    audiobook: Audiobook?,
-    bookmark: BookmarkEntry?,
-    onSpeedClick: () -> Unit,
-    onSleepTimerClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onSpeedClick) {
-                Text(
-                    text = if (playbackSpeed == 1f) "Speed: 1x" else "Speed: ${playbackSpeed}x",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-            TextButton(onClick = onSleepTimerClick) {
-                Text(
-                    text = if (sleepTimerLabel.isNotEmpty()) "⏱ $sleepTimerLabel"
-                    else "Sleep timer",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (sleepTimerLabel.isNotEmpty())
-                        MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+            Spacer(Modifier.weight(1f))
 
-        // remaining time
-        if (audiobook != null) {
-            val remainingMs = calculateTimeRemaining(audiobook as Audiobook, bookmark, playbackSpeed)
-            if (remainingMs > 0) {
-                val text = if (playbackSpeed != 1f) {
-                    val naturalMs = calculateTimeRemaining(audiobook, bookmark, 1f)
-                    "${formatDuration(remainingMs)} remaining · ${formatDuration(naturalMs)} at 1x"
-                } else {
-                    "${formatDuration(remainingMs)} remaining"
+            // seek bar
+            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+                SeekBarControl(
+                    controller = controller,
+                    currentPosition = playerState.currentPosition,
+                    duration = playerState.duration,
+                    playbackSpeed = playerState.playbackSpeed,
+                    onPositionChange = { viewModel.updatePlayerState(currentPosition = it) }
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // player controls
+            PlayerControls(
+                controller = controller,
+                isPlaying = playerState.isPlaying,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            // speed + sleep timer + remaining time
+            PlayerBottomControls(
+                playbackSpeed = playerState.playbackSpeed,
+                sleepTimerLabel = playerState.sleepTimerLabel,
+                audiobook = playerState.currentAudiobook,
+                bookmark = bookmark,
+                onSpeedClick = { showSpeedDialog = true },
+                onSleepTimerClick = { showSleepTimerDialog = true }
+            )
+
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBackToLibrary) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.LibraryBooks,
+                        contentDescription = "Back to library"
+                    )
                 }
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
+
+                IconButton(
+                    onClick = { viewModel.toggleChapterList() },
+                    enabled = hasChapters
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.List,
+                        contentDescription = "Chapters",
+                        tint = if (hasChapters)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    )
+                }
             }
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
+

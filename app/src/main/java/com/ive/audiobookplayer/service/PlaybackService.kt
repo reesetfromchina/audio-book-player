@@ -5,10 +5,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.DefaultMediaNotificationProvider
@@ -18,6 +18,7 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.ive.audiobookplayer.MainActivity
 import com.ive.audiobookplayer.R
+import com.ive.audiobookplayer.utils.SleepTimerState
 
 
 @UnstableApi
@@ -33,9 +34,9 @@ class PlaybackService : MediaSessionService() {
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)  // speech = audiobook
+                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
                     .build(),
-                true  // this true is the key — handleAudioFocus = true
+                true
             )
             .setHandleAudioBecomingNoisy(true)
             .build()
@@ -45,6 +46,18 @@ class PlaybackService : MediaSessionService() {
                 setSmallIcon(R.drawable.ic_notification)
             }
         )
+
+
+
+        player.addListener(object : Player.Listener{
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                if(SleepTimerState.endOfChapterEnabled.get()){
+                    player.pause()
+                    SleepTimerState.endOfChapterEnabled.set(false)
+                    sendBroadcast(Intent("audiobookplayer.SLEEP_TIMER_FIRED"))
+                }
+            }
+        })
 
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(buildPendingIntent())
