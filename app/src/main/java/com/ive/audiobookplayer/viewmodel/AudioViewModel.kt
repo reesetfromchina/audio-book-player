@@ -115,13 +115,13 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             libraryRepository.audiobooks.collect { audiobooksWithChapters ->
                 val audiobooks = audiobooksWithChapters.map { it.toAudiobook() }
 
+                preloadCoverUris(audiobooks)
                 _libraryState.update {
                     it.copy(
                         audiobooks = audiobooks, isInitializing = false
                     )
                 }
                 updateLibraryGroups()
-                preloadCoverUris(audiobooks)
 
 
 
@@ -203,7 +203,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                         val customUri = coverArtRepository.getCoverUri(b.audiobookId)
                         if (customUri != null) {
                             getApplication<Application>().contentResolver
-                                .openInputStream(Uri.parse(customUri))?.use { stream ->
+                                .openInputStream(customUri.toUri())?.use { stream ->
                                     Base64.encodeToString(
                                         stream.readBytes(),
                                         Base64.DEFAULT
@@ -350,17 +350,16 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private val resolvedCoverUris = mutableMapOf<String, Uri?>()
 
-    private fun preloadCoverUris(audiobooks: List<Audiobook>) {
-        viewModelScope.launch(Dispatchers.IO) {
+    private suspend fun preloadCoverUris(audiobooks: List<Audiobook>) {
+        withContext(Dispatchers.IO) {
             audiobooks.forEach { audiobook ->
                 if (!resolvedCoverUris.containsKey(audiobook.id)) {
                     val customUri = coverArtRepository.getCoverUri(audiobook.id)
-                    val uri = when {
+                    resolvedCoverUris[audiobook.id] = when {
                         customUri != null -> Uri.parse(customUri)
                         audiobook.coverUri != null -> audiobook.coverUri.toUri()
                         else -> null
                     }
-                    resolvedCoverUris[audiobook.id] = uri
                 }
             }
         }
@@ -403,6 +402,8 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isSwitchingBooks = true
             bookmarkSaveJob?.cancel()
+
+            resetBooks.remove(audiobook.id)
 
             try {
                 val bookmark = withContext(Dispatchers.IO) {
@@ -451,7 +452,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-
     fun updatePlayerState(
         isPlaying: Boolean? = null,
         currentTitle: String? = null,
@@ -536,8 +536,15 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
         val audiobook = state.currentAudiobook ?: return
 
+
+        if (resetBooks.contains(audiobook.id)){
+            return
+        }
         val position = controller.currentPosition.coerceAtLeast(0L)
         val chapterIndex = controller.currentMediaItemIndex
+
+
+        if (controller.currentPosition == 0L && controller.currentMediaItemIndex == 0) return
 
         bookmarkRepository.saveBookmark(
             audiobookId = audiobook.id,
@@ -586,6 +593,27 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+    private val resetBooks = mutableSetOf<String>()
+
+    fun resetProgress(audiobook: Audiobook){
+        viewModelScope.launch(Dispatchers.IO) {
+            resetBooks.add(audiobook.id)
+            Log.d("Reset", "Deleting bookmark for ${audiobook.title}")
+            bookmarkRepository.deleteBookmark(audiobook.id)
+            Log.d("Reset", "Bookmark deleted for ${audiobook.title}")
+
+            // if this book is currently playing clear the state.
+            if(_playerState.value.currentAudiobook?.id == audiobook.id){
+                _playerState.update {
+                    it.copy(
+                        currentAudiobook = null,
+                        currentPosition = 0L,
+                        currentChapterIndex = 0
+                    )
+                }
+            }
+        }
+    }
 
     fun setSleepTimerEndOfChapter() {
         sleepTimerJob?.cancel()
@@ -597,6 +625,18 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         _libraryState.update { it.copy(isGridView = !it.isGridView) }
     }
 
+    fun markAsFinished(audiobook: Audiobook){
+        viewModelScope.launch(Dispatchers.IO) {
+            val lastChapter = audiobook.chapters.last()
+
+            bookmarkRepository.saveBookmark(
+                audiobookId = audiobook.id,
+                chapterIndex =  audiobook.chapters.size -1,
+                positionMs = lastChapter.durationMs,
+                playbackSpeed = 1f
+            )
+        }
+    }
     private fun updateLibraryGroups() {
         viewModelScope.launch(Dispatchers.Default) {
             val audiobooks = _libraryState.value.audiobooks

@@ -57,4 +57,9 @@ interface BookmarkDao{
 
     @Query("SELECT * FROM bookmarks")
     suspend fun getAllBookmarksList() : List<BookmarkEntity>
+
+    @Query("DELETE FROM bookmarks WHERE audiobookId = :audiobookId")
+    suspend fun deleteBookmark(audiobookId: String)
+
+
 }

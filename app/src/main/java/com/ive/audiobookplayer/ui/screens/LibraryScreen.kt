@@ -1,7 +1,10 @@
 package com.ive.audiobookplayer.ui.screens
 
 import android.net.Uri
+import android.util.Log
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +48,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,8 +58,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -64,6 +70,7 @@ import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryState
 import com.ive.audiobookplayer.ui.componenets.AudiobookGrid
+import com.ive.audiobookplayer.ui.componenets.DropdownMenuComponent
 import com.ive.audiobookplayer.utils.calculateProgress
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 @Composable
@@ -151,7 +158,9 @@ fun LibraryScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
                 placeholder = { Text("Search books...") },
                 leadingIcon = { Icon(Icons.Default.Search, null) },
                 trailingIcon = {
@@ -212,7 +221,9 @@ fun LibraryScreen(
                                 audiobook = book,
                                 bookmark = library.bookmarks[book.id],
                                 coverUri = resolveCover(book),
-                                onClick = { onAudiobookSelected(book) }
+                                onClick = { onAudiobookSelected(book) },
+                                onResetProgress = {viewModel.resetProgress(book)},
+                                onFinishedAudiobook = {viewModel.markAsFinished(book)}
                             )
                         }
                     }
@@ -244,6 +255,10 @@ fun LibraryScreen(
                         bookmarks = library.bookmarks,
                         resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
+                        onResetProgress = {viewModel.resetProgress(it)},
+                        onFinishedAudiobook = {viewModel.markAsFinished(it)}
+
+
                     )
                     librarySection(
                         title = "Unplayed",
@@ -251,6 +266,10 @@ fun LibraryScreen(
                         bookmarks = library.bookmarks,
                         resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
+                        onResetProgress = {viewModel.resetProgress(it)},
+                        onFinishedAudiobook = {viewModel.markAsFinished(it)}
+
+
                     )
                     librarySection(
                         title = "Finished",
@@ -259,6 +278,9 @@ fun LibraryScreen(
                         resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
                         isFinished = true,
+                        onResetProgress = {viewModel.resetProgress(it)},
+                        onFinishedAudiobook = {viewModel.markAsFinished(it)}
+
                     )
                 }
             }
@@ -273,6 +295,8 @@ private fun LazyListScope.librarySection(
     resolveCover: (Audiobook) -> Uri?,
     onAudiobookSelected: (Audiobook) -> Unit,
     isFinished: Boolean = false,
+    onResetProgress: (Audiobook) -> Unit,
+    onFinishedAudiobook: (Audiobook) -> Unit,
 ) {
     if (books.isEmpty()) return
     val key = title.lowercase().replace(" ", "_")
@@ -286,7 +310,9 @@ private fun LazyListScope.librarySection(
             bookmark = bookmarks[book.id],
             coverUri = resolveCover(book),
             isFinished = isFinished,
-            onClick = { onAudiobookSelected(book) }
+            onClick = { onAudiobookSelected(book) },
+            onResetProgress = { onResetProgress(book) },
+            onFinishedAudiobook = { onFinishedAudiobook(book)}
         )
     }
     item(key = "spacer_$key") {
@@ -319,126 +345,143 @@ fun LibrarySectionHeader(title: String, count: Int) {
     Spacer(Modifier.height(4.dp))
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AudiobookCard(
     audiobook: Audiobook,
     bookmark: BookmarkEntry?,
     coverUri: Uri?,
     isFinished: Boolean = false,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onResetProgress: () -> Unit,
+    onFinishedAudiobook: () -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
+
     val progress = remember(audiobook, bookmark) { calculateProgress(audiobook, bookmark) }
+    var expanded by remember { mutableStateOf(false) }
 
-
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isFinished)
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            else
-                MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+    Box{
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = {
+                        expanded = true
+                        haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                    }),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isFinished)
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                else
+                    MaterialTheme.colorScheme.surface
+            )
         ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
+
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (coverUri != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(coverUri)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                    )
-                }
-                if (isFinished) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.4f)),
-                        contentAlignment = Alignment.Center
-                    ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (coverUri != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(coverUri)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
                         Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = "Finished",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                            Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                         )
                     }
+                    if (isFinished) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.4f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = "Finished",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
                 }
-            }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    audiobook.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (isFinished)
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    else
-                        MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    "${audiobook.chapters.size} chapter(s)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (bookmark != null) {
-                    Spacer(Modifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = { (progress / 100f).coerceIn(0f, 1f) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        audiobook.title,
+                        style = MaterialTheme.typography.titleMedium,
                         color = if (isFinished)
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         else
-                            MaterialTheme.colorScheme.primary
+                            MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(Modifier.height(2.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        val minutes = (bookmark.positionMs / 1000) / 60
-                        val seconds = (bookmark.positionMs / 1000) % 60
-                        Text(
-                            if (isFinished) "Finished"
-                            else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(
-                                minutes, seconds
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "%.0f%%".format(progress),
-                            style = MaterialTheme.typography.bodySmall,
+                    Text(
+                        "${audiobook.chapters.size} chapter(s)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (bookmark != null) {
+                        Spacer(Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { (progress / 100f).coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
                             color = if (isFinished)
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                             else
                                 MaterialTheme.colorScheme.primary
                         )
+                        Spacer(Modifier.height(2.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            val minutes = (bookmark.positionMs / 1000) / 60
+                            val seconds = (bookmark.positionMs / 1000) % 60
+                            Text(
+                                if (isFinished) "Finished"
+                                else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(
+                                    minutes, seconds
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "%.0f%%".format(progress),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isFinished)
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                else
+                                    MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
         }
+        DropdownMenuComponent(showMenu = expanded, onDismissRequest = {expanded = false}, audiobook = audiobook, bookmarkEntry = bookmark, onResetProgress =  onResetProgress, onFinishedProgress = onFinishedAudiobook )
+
     }
 }

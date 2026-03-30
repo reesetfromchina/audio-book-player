@@ -87,4 +87,6 @@ class BookmarkRepository(context: Context) {
             )
         }
     }
+
+    suspend fun deleteBookmark(audiobookId: String) = bookmarkDao.deleteBookmark(audiobookId)
 }
