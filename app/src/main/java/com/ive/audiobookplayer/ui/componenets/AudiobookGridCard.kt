@@ -2,6 +2,7 @@ package com.ive.audiobookplayer.ui.componenets
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +24,10 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,7 +49,10 @@ fun AudiobookGridCard(
     audiobook: Audiobook,
     bookmark: BookmarkEntry?,
     coverUri: Uri?,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onResetProgress: () -> Unit,
+    onFinishedAudiobook: () -> Unit,
+
 ) {
     val progress = remember(audiobook.id, bookmark?.positionMs, bookmark?.chapterIndex) {
         calculateProgress(audiobook, bookmark)
@@ -53,9 +60,17 @@ fun AudiobookGridCard(
     val isFinished = progress >= 95f
     val hasStarted = bookmark != null && progress > 0f
 
+    var expanded by remember { mutableStateOf(false) }
+
+
     Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    expanded = true
+                }
+            ),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -165,6 +180,8 @@ fun AudiobookGridCard(
                     }
                 }
             }
+            DropdownMenuComponent(showMenu = expanded, onDismissRequest = {expanded = false}, audiobook = audiobook, bookmarkEntry = bookmark, onResetProgress =  onResetProgress, onFinishedProgress = onFinishedAudiobook )
+
         }
     }
 }

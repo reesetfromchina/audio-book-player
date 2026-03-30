@@ -19,6 +19,8 @@ fun AudiobookGrid(
     bookmarks: Map<String, BookmarkEntry>,
     onAudiobookSelected: (Audiobook) -> Unit,
     resolveCover: (Audiobook) -> Uri?,
+    onResetProgress: (Audiobook) -> Unit,
+    onFinishedAudiobook: (Audiobook) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
 
@@ -34,7 +36,9 @@ fun AudiobookGrid(
                 audiobook = book,
                 bookmark = bookmarks[book.id],
                 coverUri = resolveCover(book),
-                onClick = { onAudiobookSelected(book) }
+                onClick = { onAudiobookSelected(book) },
+                onResetProgress = {onResetProgress(book)},
+                onFinishedAudiobook = {onFinishedAudiobook(book)}
             )
         }
     }

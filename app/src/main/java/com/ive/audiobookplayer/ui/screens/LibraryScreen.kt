@@ -241,6 +241,8 @@ fun LibraryScreen(
                     bookmarks = library.bookmarks,
                     resolveCover = resolveCover,
                     onAudiobookSelected = onAudiobookSelected,
+                    onResetProgress = {viewModel.resetProgress(it)},
+                    onFinishedAudiobook = {viewModel.markAsFinished(it)},
                 )
             }
 
