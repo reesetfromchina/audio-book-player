@@ -17,10 +17,9 @@ data class Chapter(
     val uri: String,
     val title: String,
     val index: Int,
-    val durationMs: Long = 0L
-) {
-    val isUnknownDuration get() = durationMs == 0L
-}
+    val durationMs: Long = 0L,
+    val startMs: Long = 0L,
+)
 @Stable
 @Serializable
 data class BookmarkEntry(

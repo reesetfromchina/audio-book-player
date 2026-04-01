@@ -32,9 +32,9 @@ data class ChapterEntity(
     val title: String,
     val uri: String,
     val index: Int,
-    val durationMs: Long = 0L
+    val durationMs: Long = 0L,
+    val startMs: Long = 0L,
 )
-
 @Entity(tableName = "bookmarks")
 data class BookmarkEntity(
     @PrimaryKey

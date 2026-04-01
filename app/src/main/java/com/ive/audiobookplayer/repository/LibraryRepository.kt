@@ -35,6 +35,7 @@ class LibraryRepository(context: Context) {
                     uri = chapter.uri,
                     index = chapter.index,
                     durationMs = chapter.durationMs,
+                    startMs = chapter.startMs,
                 )
             }
         )

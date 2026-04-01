@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.net.toUri
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.Chapter
+import com.ive.audiobookplayer.utils.CueParser
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -26,7 +27,8 @@ class AudiobookScanner(private val context: Context) {
 
     private data class FolderContents(
         val audioFiles: List<Pair<String, String>>,
-        val coverUri: String?
+        val coverUri: String?,
+        val cueFileContent: String? = null
     )
 
     private fun scanFolderContents(rootUri: Uri, folderDocId: String): FolderContents {
@@ -34,6 +36,7 @@ class AudiobookScanner(private val context: Context) {
         val audioFiles = mutableListOf<Pair<String, String>>()
         var priorityCover: String? = null
         var firstImageUri: String? = null
+        var cueContent: String? = null
 
         context.contentResolver.query(
             childrenUri,
@@ -48,9 +51,10 @@ class AudiobookScanner(private val context: Context) {
                 val name = cursor.getString(1) ?: continue
                 val ext = name.substringAfterLast(".", "").lowercase()
 
-                when (ext) {
-                    in AUDIO_EXTENSIONS -> audioFiles.add(docId to name)
-                    in IMAGE_EXTENSIONS -> {
+
+                when {
+                    ext in AUDIO_EXTENSIONS -> audioFiles.add(docId to name)
+                    ext in IMAGE_EXTENSIONS -> {
                         val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId).toString()
                         val nameWithoutExt = name.substringBeforeLast(".").lowercase()
                         if (nameWithoutExt in COVER_NAMES) {
@@ -59,13 +63,32 @@ class AudiobookScanner(private val context: Context) {
                             firstImageUri = uri
                         }
                     }
+                    ext == "cue" -> {
+                        try {
+                            val cueUri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
+                            cueContent = context.contentResolver.openInputStream(cueUri)
+                                ?.bufferedReader()
+                                ?.readText()
+                        } catch (e: Exception) {
+                        }
+                    }
                 }
             }
         }
-
         return FolderContents(
             audioFiles = audioFiles.sortedBy { it.second },
-            coverUri = priorityCover ?: firstImageUri
+            coverUri = priorityCover ?: firstImageUri,
+            cueFileContent = cueContent,
+        )
+    }
+
+    private fun buildChapter(rootUri: Uri, docId: String, name: String, index: Int): Chapter {
+        val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
+        return Chapter(
+            uri = uri.toString(),
+            title = name.substringBeforeLast("."),
+            index = index,
+            durationMs = getAudioDuration(uri)
         )
     }
 
@@ -109,19 +132,45 @@ class AudiobookScanner(private val context: Context) {
     }
 
     private suspend fun buildAudiobook(rootUri: Uri, folderName: String, folderDocId: String, files: List<Pair<String, String>>): Audiobook = coroutineScope {
-        val chapters = files.mapIndexed { index, (docId, name) ->
-            async(Dispatchers.IO) {
-                val uri = DocumentsContract.buildDocumentUriUsingTree(rootUri, docId)
-                Chapter(
-                    uri = uri.toString(),
-                    title = name.substringBeforeLast("."),
-                    index = index,
-                    durationMs = getAudioDuration(uri)
-                )
-            }
-        }.awaitAll()
 
         val contents = scanFolderContents(rootUri, folderDocId)
+
+        val chapters = when {
+            contents.cueFileContent != null && files.size == 1 ->{
+                val audioUri = DocumentsContract
+                    .buildDocumentUriUsingTree(rootUri, files.first().first)
+                    .toString()
+                val cueChapters = CueParser.parse(contents.cueFileContent, audioUri)
+
+                if (cueChapters.isNotEmpty()){
+                    //get total duration for the last chapter
+                    val totalDuration = getAudioDuration(
+                        DocumentsContract.buildDocumentUriUsingTree(rootUri, files.first().first)
+                    )
+                    // fix last chapter duration
+                    cueChapters.toMutableList().also { list ->
+                        val last = list.last()
+                        if (last.durationMs == 0L && totalDuration > 0L){
+                            list[list.size -1 ] = last.copy(
+                                durationMs = totalDuration - last.startMs
+                            )
+                        }
+                    }
+                } else{
+                    // cue parse failed -- fall back to single chapter
+                    listOf(buildChapter(rootUri, files.first().first, files.first().second, 0))
+                }
+            }
+            // multiple audio files - treat each as a chapter
+            else ->{
+                files.mapIndexed { index, (docId, name) ->
+                    async(Dispatchers.IO){
+                        buildChapter(rootUri, docId,name, index)
+                    }
+                }.awaitAll()
+            }
+        }
+
 
         // if no folder cover, try extracting from first audio file
         val coverUri = contents.coverUri ?: run {

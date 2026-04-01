@@ -16,7 +16,8 @@ fun AudiobookWithChapters.toAudiobook(): Audiobook {
                     uri = chapter.uri,
                     title = chapter.title,
                     index = chapter.index,
-                    durationMs = chapter.durationMs
+                    durationMs = chapter.durationMs,
+                    startMs = chapter.startMs
                 )
             }
     )

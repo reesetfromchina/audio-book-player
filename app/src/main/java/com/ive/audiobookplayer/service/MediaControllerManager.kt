@@ -56,14 +56,49 @@ class MediaControllerManager(private val application: Application) {
     ) {
         val controller = _controller.value ?: return
 
-        val mediaItems = audiobook.chapters.map { chapter ->
-            MediaItem.Builder().setMediaId(chapter.uri).setRequestMetadata(
-                    MediaItem.RequestMetadata.Builder().setMediaUri(chapter.uri.toUri()).build()
-                ).setMediaMetadata(
-                    MediaMetadata.Builder().setTitle(chapter.title).setAlbumTitle(audiobook.title)
-                        .setArtworkUri(coverUri).build()
-                ).build()
+        val mediaItems = audiobook.chapters.mapIndexed { index, chapter ->
+            val clippingConfig = if (chapter.durationMs > 0L) {
+                MediaItem.ClippingConfiguration.Builder()
+                    .setStartPositionMs(chapter.startMs)
+                    .setEndPositionMs(chapter.startMs + chapter.durationMs)
+                    .build()
+            } else if (index < audiobook.chapters.size - 1) {
+                val nextChapter = audiobook.chapters[index + 1]
+                MediaItem.ClippingConfiguration.Builder()
+                    .setStartPositionMs(chapter.startMs)
+                    .setEndPositionMs(nextChapter.startMs)
+                    .build()
+            } else {
+                MediaItem.ClippingConfiguration.Builder()
+                    .setStartPositionMs(chapter.startMs)
+                    .build()
+            }
+            val displayTitle = if (chapter.title.startsWith("Chapter ")) {
+                audiobook.title
+            } else {
+                chapter.title
+            }
+
+
+            MediaItem.Builder()
+                .setUri(chapter.uri.toUri())
+                .setMediaId(chapter.uri)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(displayTitle)
+                        .setSubtitle(audiobook.title)
+                        .setAlbumTitle(audiobook.title)
+                        .setArtworkUri(coverUri)
+                        .build()
+                )
+                .apply {
+                    if (clippingConfig != null) {
+                        setClippingConfiguration(clippingConfig)
+                    }
+                }
+                .build()
         }
+
 
         controller.setMediaItems(
             mediaItems, startChapterIndex, startPositionMs
