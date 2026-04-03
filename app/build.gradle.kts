@@ -43,8 +43,6 @@ android {
 }
 
 dependencies {
-    implementation("net.jthink:jaudiotagger:3.0.1")
-
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.material3)

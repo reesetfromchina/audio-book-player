@@ -41,6 +41,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
+import com.ive.audiobookplayer.utils.TimeFormatter
 import com.ive.audiobookplayer.utils.calculateProgress
 
 
@@ -52,8 +53,7 @@ fun AudiobookGridCard(
     onClick: () -> Unit,
     onResetProgress: () -> Unit,
     onFinishedAudiobook: () -> Unit,
-
-) {
+    ) {
     val progress = remember(audiobook.id, bookmark?.positionMs, bookmark?.chapterIndex) {
         calculateProgress(audiobook, bookmark)
     }
@@ -62,9 +62,11 @@ fun AudiobookGridCard(
 
     var expanded by remember { mutableStateOf(false) }
 
+    val bookTotalTime = TimeFormatter.formatTime(audiobook.chapters.sumOf { it.durationMs })
 
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
@@ -158,6 +160,11 @@ fun AudiobookGridCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Text(
+                            text = bookTotalTime,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         when {
                             isFinished -> Text(
                                 "✓ Done",
@@ -165,12 +172,14 @@ fun AudiobookGridCard(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Medium
                             )
+
                             hasStarted -> Text(
                                 "%.0f%%".format(progress),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Medium
                             )
+
                             else -> Text(
                                 "New",
                                 style = MaterialTheme.typography.labelSmall,
@@ -180,7 +189,15 @@ fun AudiobookGridCard(
                     }
                 }
             }
-            DropdownMenuComponent(showMenu = expanded, onDismissRequest = {expanded = false}, audiobook = audiobook, bookmarkEntry = bookmark, onResetProgress =  onResetProgress, onFinishedProgress = onFinishedAudiobook )
+            DropdownMenuComponent(
+                showMenu = expanded,
+                onDismissRequest = { expanded = false },
+                audiobook = audiobook,
+                bookmarkEntry = bookmark,
+                onResetProgress = onResetProgress,
+                onFinishedProgress = onFinishedAudiobook,
+                coverUri = coverUri
+            )
 
         }
     }

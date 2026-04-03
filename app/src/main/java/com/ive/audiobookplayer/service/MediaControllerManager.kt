@@ -44,6 +44,48 @@ class MediaControllerManager(private val application: Application) {
         }, MoreExecutors.directExecutor())
     }
 
+    fun prepareAudiobook(
+        audiobook: Audiobook,
+        startChapterIndex: Int = 0,
+        startPositionMs: Long = 0L,
+        coverUri: Uri? = null
+    ){
+        val controller = _controller.value ?: return
+
+        val mediaItems =  audiobook.chapters.map{ chapter ->
+            MediaItem.Builder()
+                .setMediaId(chapter.uri)
+                .setRequestMetadata(
+                    MediaItem.RequestMetadata.Builder()
+                        .setMediaUri(chapter.uri.toUri())
+                        .build()
+                )
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(chapter.title)
+                        .setAlbumTitle(audiobook.title)
+                        .setArtworkUri(coverUri)
+                        .build()
+                ).apply {
+                    if(chapter.startMs>0L){
+                        setClippingConfiguration(
+                            MediaItem.ClippingConfiguration.Builder()
+                                .setStartPositionMs(chapter.startMs)
+                                .apply {
+                                    if(chapter.durationMs > 0L){
+                                        setEndPositionMs(chapter.startMs + chapter.durationMs)
+                                    }
+                                }.build()
+                        )
+                    }
+                }.build()
+        }
+
+        controller.setMediaItems(mediaItems, startChapterIndex, startPositionMs)
+        controller.playWhenReady = false
+        controller.prepare()
+    }
+
 
     /**
      * Plays an audiobook, restoring position from a bookmark if provided.
@@ -54,7 +96,11 @@ class MediaControllerManager(private val application: Application) {
         startPositionMs: Long = 0L,
         coverUri: Uri? = null
     ) {
-        val controller = _controller.value ?: return
+        val controller = _controller.value
+        if (controller == null) {
+            Log.d("MediaController", "Controller not ready yet")
+            return
+        }
 
         val mediaItems = audiobook.chapters.mapIndexed { index, chapter ->
             val clippingConfig = if (chapter.durationMs > 0L) {
@@ -103,8 +149,9 @@ class MediaControllerManager(private val application: Application) {
         controller.setMediaItems(
             mediaItems, startChapterIndex, startPositionMs
         )
-        controller.playWhenReady = false // never autoplay when switching books
+//        controller.playWhenReady = false // never autoplay when switching books
         controller.prepare()
+        controller.play()
     }
 
 

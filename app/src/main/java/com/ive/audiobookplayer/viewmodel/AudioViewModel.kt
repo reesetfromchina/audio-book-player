@@ -44,6 +44,8 @@ import com.ive.audiobookplayer.model.LibraryState
 import com.ive.audiobookplayer.repository.LibraryRepository
 import com.ive.audiobookplayer.repository.SettingsRepository
 import com.ive.audiobookplayer.utils.calculateProgress
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -68,6 +70,8 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private val _libraryState = MutableStateFlow(LibraryState())
     val libraryState: StateFlow<LibraryState> = _libraryState.asStateFlow()
 
+    private val _events = MutableSharedFlow<LibraryEvent>()
+    val events = _events.asSharedFlow()
 
     private var bookmarkSaveJob: Job? = null
     private var sleepTimerJob: Job? = null
@@ -124,7 +128,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 updateLibraryGroups()
 
 
-
                 if (_playerState.value.currentAudiobook == null) {
                     settingsRepository.getLastBookId()?.let { lastId ->
                         val lastBook = audiobooks.find { it.id == lastId }
@@ -132,6 +135,17 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                             val bookmark = withContext(Dispatchers.IO) {
                                 bookmarkRepository.getBookmark(lastId)
                             }
+
+                            val customCoverUri = withContext(Dispatchers.IO){
+                                coverArtRepository.getCoverUri(lastId)
+                            }
+
+                            val coverUri = when {
+                                customCoverUri != null -> Uri.parse(customCoverUri)
+                                lastBook.coverUri != null -> lastBook.coverUri.toUri()
+                                else -> null
+                            }
+
                             _playerState.update {
                                 it.copy(
                                     currentAudiobook = lastBook,
@@ -139,8 +153,23 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                                     currentChapterIndex = bookmark?.chapterIndex ?: 0,
                                     currentPosition = bookmark?.positionMs ?: 0L,
                                     playbackSpeed = bookmark?.playbackSpeed ?: 1f,
+                                    duration = lastBook.chapters[bookmark?.chapterIndex ?: 0].durationMs
                                 )
                             }
+
+                            viewModelScope.launch {
+                                controllerManager.controller.first { it != null }
+                                controllerManager.prepareAudiobook(
+                                    audiobook = lastBook,
+                                    startChapterIndex = bookmark?.chapterIndex ?: 0,
+                                    startPositionMs = bookmark?.positionMs ?: 0L,
+                                    coverUri = coverUri
+                                )
+                                _playerState.value.controller?.setPlaybackSpeed(
+                                    bookmark?.playbackSpeed ?: 1f
+                                )
+                            }
+
                             loadCoverArt(lastBook)
                         }
                     }
@@ -230,7 +259,11 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 getApplication<Application>().contentResolver.openOutputStream(uri)?.use { stream ->
                     stream.write(json.toByteArray())
                 }
+
+                _events.emit(LibraryEvent.ExportSuccess)
             } catch (e: Exception) {
+                _events.emit(LibraryEvent.ExportError(e.message ?: "Error"))
+
             }
         }
     }
@@ -275,9 +308,11 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 resolvedCoverUris.clear()
+                _events.emit(LibraryEvent.ImportSuccess)
                 Log.d("Backup", "Import successful — ${backup.bookmarks.size} bookmarks restored")
             } catch (e: Exception) {
                 Log.e("Backup", "Import failed", e)
+                _events.emit(LibraryEvent.ImportError(e.message ?: "Error"))
             }
         }
     }
@@ -707,6 +742,15 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         return sampleSize
     }
 
+
+    sealed class LibraryEvent {
+        object ImportSuccess : LibraryEvent()
+        data class ImportError(val message: String) : LibraryEvent()
+        object ExportSuccess : LibraryEvent()
+        data class ExportError(val message: String) : LibraryEvent()
+    }
+
+
     override fun onCleared() {
         super.onCleared()
         getApplication<Application>().unregisterReceiver(sleepTimerReceiver)
@@ -714,3 +758,4 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { controllerManager.release() }
     }
 }
+

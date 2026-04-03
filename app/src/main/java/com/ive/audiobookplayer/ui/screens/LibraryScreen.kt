@@ -1,7 +1,7 @@
 package com.ive.audiobookplayer.ui.screens
 
 import android.net.Uri
-import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -48,8 +48,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,6 +73,8 @@ import com.ive.audiobookplayer.ui.componenets.AudiobookGrid
 import com.ive.audiobookplayer.ui.componenets.DropdownMenuComponent
 import com.ive.audiobookplayer.utils.calculateProgress
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
+import com.ive.audiobookplayer.viewmodel.AudioViewModel.LibraryEvent
+
 @Composable
 fun LibraryScreen(
     viewModel: AudioViewModel,
@@ -85,6 +87,7 @@ fun LibraryScreen(
     val listState = rememberLazyListState()
     var searchQuery by remember { mutableStateOf("") }
     val isSearching = searchQuery.isNotEmpty()
+    val context = LocalContext.current
 
     val resolveCover = remember(viewModel) {
         { audiobook: Audiobook -> viewModel.resolveCoverUri(audiobook) }
@@ -94,6 +97,25 @@ fun LibraryScreen(
         if (isSearching) library.audiobooks.filter {
             it.title.contains(searchQuery, ignoreCase = true)
         } else emptyList()
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is LibraryEvent.ImportSuccess -> {
+                    Toast.makeText(context, "Import successful", Toast.LENGTH_SHORT).show()
+                }
+                is LibraryEvent.ImportError -> {
+                    Toast.makeText(context, "Import failed", Toast.LENGTH_SHORT).show()
+                }
+                is LibraryEvent.ExportSuccess -> {
+                    Toast.makeText(context, "Export successful", Toast.LENGTH_SHORT).show()
+                }
+                is LibraryEvent.ExportError -> {
+                    Toast.makeText(context, "Export failed", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     Column(
@@ -139,12 +161,18 @@ fun LibraryScreen(
                     ) {
                         DropdownMenuItem(
                             text = { Text("Export backup") },
-                            onClick = { showBackupMenu = false; onExportBackup() },
+                            onClick = {
+                                showBackupMenu = false
+                                onExportBackup()
+                            },
                             leadingIcon = { Icon(Icons.Default.Upload, null) }
                         )
                         DropdownMenuItem(
                             text = { Text("Import backup") },
-                            onClick = { showBackupMenu = false; onImportBackup() },
+                            onClick = {
+                                showBackupMenu = false
+                                onImportBackup()
+                            },
                             leadingIcon = { Icon(Icons.Default.Download, null) }
                         )
                     }
@@ -222,8 +250,8 @@ fun LibraryScreen(
                                 bookmark = library.bookmarks[book.id],
                                 coverUri = resolveCover(book),
                                 onClick = { onAudiobookSelected(book) },
-                                onResetProgress = {viewModel.resetProgress(book)},
-                                onFinishedAudiobook = {viewModel.markAsFinished(book)}
+                                onResetProgress = { viewModel.resetProgress(book) },
+                                onFinishedAudiobook = { viewModel.markAsFinished(book) }
                             )
                         }
                     }
@@ -241,8 +269,8 @@ fun LibraryScreen(
                     bookmarks = library.bookmarks,
                     resolveCover = resolveCover,
                     onAudiobookSelected = onAudiobookSelected,
-                    onResetProgress = {viewModel.resetProgress(it)},
-                    onFinishedAudiobook = {viewModel.markAsFinished(it)},
+                    onResetProgress = { viewModel.resetProgress(it) },
+                    onFinishedAudiobook = { viewModel.markAsFinished(it) },
                 )
             }
 
@@ -257,8 +285,8 @@ fun LibraryScreen(
                         bookmarks = library.bookmarks,
                         resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
-                        onResetProgress = {viewModel.resetProgress(it)},
-                        onFinishedAudiobook = {viewModel.markAsFinished(it)}
+                        onResetProgress = { viewModel.resetProgress(it) },
+                        onFinishedAudiobook = { viewModel.markAsFinished(it) }
 
 
                     )
@@ -268,8 +296,8 @@ fun LibraryScreen(
                         bookmarks = library.bookmarks,
                         resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
-                        onResetProgress = {viewModel.resetProgress(it)},
-                        onFinishedAudiobook = {viewModel.markAsFinished(it)}
+                        onResetProgress = { viewModel.resetProgress(it) },
+                        onFinishedAudiobook = { viewModel.markAsFinished(it) }
 
 
                     )
@@ -280,8 +308,8 @@ fun LibraryScreen(
                         resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
                         isFinished = true,
-                        onResetProgress = {viewModel.resetProgress(it)},
-                        onFinishedAudiobook = {viewModel.markAsFinished(it)}
+                        onResetProgress = { viewModel.resetProgress(it) },
+                        onFinishedAudiobook = { viewModel.markAsFinished(it) }
 
                     )
                 }
@@ -314,7 +342,7 @@ private fun LazyListScope.librarySection(
             isFinished = isFinished,
             onClick = { onAudiobookSelected(book) },
             onResetProgress = { onResetProgress(book) },
-            onFinishedAudiobook = { onFinishedAudiobook(book)}
+            onFinishedAudiobook = { onFinishedAudiobook(book) }
         )
     }
     item(key = "spacer_$key") {
@@ -483,7 +511,15 @@ fun AudiobookCard(
                 }
             }
         }
-        DropdownMenuComponent(showMenu = expanded, onDismissRequest = {expanded = false}, audiobook = audiobook, bookmarkEntry = bookmark, onResetProgress =  onResetProgress, onFinishedProgress = onFinishedAudiobook )
+        DropdownMenuComponent(
+            showMenu = expanded,
+            onDismissRequest = { expanded = false },
+            audiobook = audiobook,
+            bookmarkEntry = bookmark,
+            onResetProgress = onResetProgress,
+            onFinishedProgress = onFinishedAudiobook,
+            coverUri = coverUri
+        )
 
     }
 }

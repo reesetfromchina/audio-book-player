@@ -1,5 +1,6 @@
 package com.ive.audiobookplayer.ui.componenets
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.ive.audiobookplayer.model.Audiobook
@@ -38,10 +40,12 @@ fun DropdownMenuComponent(
     showMenu: Boolean, audiobook: Audiobook,
     bookmarkEntry: BookmarkEntry?,
     onResetProgress: () -> Unit,
-    onFinishedProgress: () -> Unit
+    onFinishedProgress: () -> Unit,
+    coverUri: Uri?
 ) {
     val sheetState = rememberModalBottomSheetState()
     var showBottomSheet by remember { mutableStateOf(false) }
+    var currentUri: Uri
     DropdownMenu(
         expanded = showMenu,
         onDismissRequest = onDismissRequest
@@ -93,10 +97,11 @@ fun DropdownMenuComponent(
                     Text("Current position: ${TimeFormatter.formatTime(bookmarkEntry.positionMs)}")
 
                 }
-                if (audiobook.coverUri != null) {
+                if (audiobook.coverUri != null || coverUri != null) {
+                    currentUri = coverUri ?: audiobook.coverUri?.toUri()!!
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(audiobook.coverUri)
+                            .data(currentUri)
                             .crossfade(true)
                             .build(),
                         contentDescription = null,
