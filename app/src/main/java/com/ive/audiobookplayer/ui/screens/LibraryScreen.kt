@@ -25,14 +25,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Button
@@ -46,7 +44,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -85,19 +82,12 @@ fun LibraryScreen(
     onImportBackup: () -> Unit,
 ) {
     val listState = rememberLazyListState()
-    var searchQuery by remember { mutableStateOf("") }
-    val isSearching = searchQuery.isNotEmpty()
     val context = LocalContext.current
 
     val resolveCover = remember(viewModel) {
         { audiobook: Audiobook -> viewModel.resolveCoverUri(audiobook) }
     }
 
-    val filteredBooks = remember(searchQuery, library.audiobooks) {
-        if (isSearching) library.audiobooks.filter {
-            it.title.contains(searchQuery, ignoreCase = true)
-        } else emptyList()
-    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -182,27 +172,6 @@ fun LibraryScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        if (!library.isInitializing && !library.isScanning && library.audiobooks.isNotEmpty()) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                placeholder = { Text("Search books...") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
-                    if (isSearching) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, null)
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
-            )
-        }
-
         when {
             library.isInitializing -> Box(Modifier.fillMaxSize())
 
@@ -229,31 +198,6 @@ fun LibraryScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Button(onClick = onPickFolder) { Text("Pick folder") }
-                    }
-                }
-            }
-
-            isSearching -> {
-                if (filteredBooks.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            "No books found for \"$searchQuery\"",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(filteredBooks, key = { it.id }) { book ->
-                            AudiobookCard(
-                                audiobook = book,
-                                bookmark = library.bookmarks[book.id],
-                                coverUri = resolveCover(book),
-                                onClick = { onAudiobookSelected(book) },
-                                onResetProgress = { viewModel.resetProgress(book) },
-                                onFinishedAudiobook = { viewModel.markAsFinished(book) }
-                            )
-                        }
                     }
                 }
             }
