@@ -155,29 +155,17 @@ fun MainScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(WindowInsets.safeDrawing.asPaddingValues()),
+                .padding(WindowInsets.safeDrawing.asPaddingValues())
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.height(8.dp))
 
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            ) {
-                Text(
-                    "Now Playing",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                )
-            }
+            Spacer(Modifier.weight(0.5f))
 
-            Spacer(Modifier.height(8.dp))
-
+            // title + chapter
             Text(
                 text = playerState.currentBookTitle.ifEmpty { playerState.chapterTitle },
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -198,7 +186,7 @@ fun MainScreen(
                 )
             }
 
-            Spacer(Modifier.height(48.dp))
+            Spacer(Modifier.weight(1f))
 
             // cover art
             Card(
@@ -211,7 +199,7 @@ fun MainScreen(
                 CoverArt(
                     coverBitmap = playerState.currentCoverBitmap,
                     size = coverSize,
-                    enabled = playerState.currentAudiobook != null,
+                    enabled = true,
                     onPickCover = onPickCover
                 )
             }
@@ -219,27 +207,23 @@ fun MainScreen(
             Spacer(Modifier.weight(1f))
 
             // seek bar
-            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                SeekBarControl(
-                    controller = controller,
-                    currentPosition = playerState.currentPosition,
-                    duration = playerState.duration,
-                    playbackSpeed = playerState.playbackSpeed,
-                    onPositionChange = { viewModel.updatePlayerState(currentPosition = it) }
-                )
-            }
+            SeekBarControl(
+                controller = controller,
+                currentPosition = playerState.currentPosition,
+                duration = playerState.duration,
+                playbackSpeed = playerState.playbackSpeed,
+                onPositionChange = { viewModel.updatePlayerState(currentPosition = it) }
+            )
 
             Spacer(Modifier.height(8.dp))
 
-            // player controls
             PlayerControls(
                 controller = controller,
                 isPlaying = playerState.isPlaying,
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
 
-            // speed + sleep timer + remaining time
             PlayerBottomControls(
                 playbackSpeed = playerState.playbackSpeed,
                 sleepTimerLabel = playerState.sleepTimerLabel,
@@ -249,11 +233,10 @@ fun MainScreen(
                 onSleepTimerClick = { showSleepTimerDialog = true }
             )
 
+            Spacer(Modifier.weight(0.5f))
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -263,7 +246,6 @@ fun MainScreen(
                         contentDescription = "Back to library"
                     )
                 }
-
                 IconButton(
                     onClick = { viewModel.toggleChapterList() },
                     enabled = hasChapters
@@ -279,7 +261,7 @@ fun MainScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
         }
     }
 }

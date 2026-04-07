@@ -15,8 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -62,7 +62,10 @@ fun AudiobookGridCard(
 
     var expanded by remember { mutableStateOf(false) }
 
-    val bookTotalTime = TimeFormatter.formatTime(audiobook.chapters.sumOf { it.durationMs })
+
+    val bookTotalTime = remember(audiobook.id) {
+        TimeFormatter.formatTime(audiobook.chapters.sumOf { it.durationMs })
+    }
 
     Card(
         modifier = Modifier
@@ -92,13 +95,13 @@ fun AudiobookGridCard(
                                 .data(coverUri)
                                 .crossfade(true)
                                 .build(),
-                            contentDescription = null,
+                            contentDescription = "Cover art for ${audiobook.title}",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
                         Icon(
-                            Icons.Default.MusicNote,
+                            Icons.AutoMirrored.Filled.MenuBook,
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
@@ -131,7 +134,7 @@ fun AudiobookGridCard(
                                 .height(4.dp)
                                 .align(Alignment.BottomCenter),
                             color = MaterialTheme.colorScheme.primary,
-                            trackColor = Color.Black.copy(alpha = 0.3f)
+                            trackColor = Color.Transparent
                         )
                     }
                 }
@@ -145,6 +148,7 @@ fun AudiobookGridCard(
                         audiobook.title,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
+                        minLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         fontWeight = FontWeight.SemiBold,
                         lineHeight = 18.sp

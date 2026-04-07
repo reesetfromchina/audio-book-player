@@ -1,14 +1,12 @@
 package com.ive.audiobookplayer.ui.theme
 
-import android.os.Build
+
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
@@ -32,24 +30,57 @@ private val LightColorScheme = lightColorScheme(
     */
 )
 
+private val DarkScheme = darkColorScheme(
+    primary = red,
+    onPrimary = white,
+    background = black,
+    surface = darkGrey,
+    onBackground = white,
+    onSurface = white,
+    secondaryContainer = Color(0xFF212121)
+)
+
+private val LightScheme = lightColorScheme(
+    primary = red,
+    onPrimary = white,
+    background = white,
+    surface = lightGrey,
+    onBackground = black,
+    onSurface = black,
+    secondaryContainer = Color(0xFFE5E5E5)
+)
+
+
+private val DarkAudiobookScheme = darkColorScheme(
+    primary = BookAmber,
+    onPrimary = Color.Black,
+    background = DeepEspresso,
+    surface = Color(0xFF252121),
+    onBackground = Color(0xFFE0E0E0),
+    onSurface = Color(0xFFE0E0E0),
+    secondaryContainer = Color(0xFF3E3939)
+)
+
+private val LightAudiobookScheme = lightColorScheme(
+    primary = BookAmber,
+    onPrimary = Color.Black,
+    background = AgedPaper,
+    surface = Color(0xFFF5EEDA),
+    onBackground = InkBlack,
+    onSurface = InkBlack,
+    secondaryContainer = Color(0xFFE9E0C9)
+)
+
 @Composable
 fun AudioBookTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val context = LocalContext.current
-
-    val colorScheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(context)
-            else dynamicLightColorScheme(context)
-        }
-        darkTheme -> darkColorScheme()
-        else -> lightColorScheme()
-    }
+    val colorScheme = if (darkTheme) DarkScheme else LightScheme
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = Typography,
         content = content
     )
 }
