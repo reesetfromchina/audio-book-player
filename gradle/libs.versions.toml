@@ -26,6 +26,8 @@ uiUnit = "1.10.6"
 uiGeometry = "1.10.6"
 uiVersion = "1.10.6"
 foundationVersion = "1.10.6"
+uiText = "1.10.6"
+foundationLayoutVersion = "1.10.6"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -59,6 +61,8 @@ androidx-compose-ui-unit = { group = "androidx.compose.ui", name = "ui-unit", ve
 androidx-compose-ui-geometry = { group = "androidx.compose.ui", name = "ui-geometry", version.ref = "uiGeometry" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "uiVersion" }
 androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundationVersion" }
+androidx-compose-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.ref = "uiText" }
+androidx-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayoutVersion" }
 
 
 [plugins]

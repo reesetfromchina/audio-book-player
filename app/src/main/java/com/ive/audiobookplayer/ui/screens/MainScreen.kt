@@ -1,6 +1,5 @@
 package com.ive.audiobookplayer.ui.screens
 
-import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +23,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -64,31 +64,24 @@ fun MainScreen(
     val playerState by viewModel.playerState.collectAsState()
     val libraryState by viewModel.libraryState.collectAsState()
     val controller = playerState.controller
+
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
-    if (controller == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+
+    if (controller == null || libraryState.isInitializing) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
         return
     }
 
-
-
-    var showNoteDialog by remember { mutableStateOf(false) }
-
-
-    val snackbarMessage by viewModel.snackbarMessage.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    // dialogs
     if (playerState.showChapterList && playerState.currentAudiobook != null) {
         ChapterListSheet(
             audiobook = playerState.currentAudiobook!!,
             currentChapterIndex = playerState.currentChapterIndex,
             bookmarks = libraryState.bookmarks,
             onChapterSelected = { viewModel.jumpToChapter(it) },
-            onDismiss = { viewModel.toggleChapterList() }
+            onDismiss = { viewModel.toggleChapterList() },
         )
     }
     if (showSleepTimerDialog) {
@@ -96,7 +89,7 @@ fun MainScreen(
             currentLabel = playerState.sleepTimerLabel,
             onDismiss = { showSleepTimerDialog = false },
             onTimerSelected = { viewModel.setSleepTimer(it) },
-            onEndChapter = { viewModel.setSleepTimerEndOfChapter() }
+            onEndChapter = { viewModel.setSleepTimerEndOfChapter() },
         )
     }
     if (showSpeedDialog) {
@@ -106,11 +99,9 @@ fun MainScreen(
                 controller.setPlaybackSpeed(speed)
                 viewModel.updatePlayerState(playbackSpeed = speed)
             },
-            onDismiss = { showSpeedDialog = false }
+            onDismiss = { showSpeedDialog = false },
         )
     }
-
-
 
     DisposableEffect(controller) {
         val listener = object : Player.Listener {
@@ -123,7 +114,6 @@ fun MainScreen(
                     duration = controller.duration.coerceAtLeast(0L),
                     currentChapterIndex = controller.currentMediaItemIndex,
                 )
-
             }
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
                 viewModel.updatePlayerState(playbackSpeed = playbackParameters.speed)
@@ -140,52 +130,44 @@ fun MainScreen(
     }
 
     LaunchedEffect(playerState.isPlaying) {
-        while (true) {
-            if (!playerState.isPlaying) break
+        while (playerState.isPlaying) {
             viewModel.updatePlayerState(currentPosition = controller.currentPosition)
             delay(500)
         }
     }
 
     val configuration = LocalConfiguration.current
-    val coverSize = (configuration.screenHeightDp * 0.38f).dp.coerceIn(140.dp, 260.dp)
+    val coverSize = (configuration.screenHeightDp * 0.36f).dp.coerceIn(140.dp, 240.dp)
     val bookmark = libraryState.bookmarks[playerState.currentAudiobook?.id]
     val hasChapters = (playerState.currentAudiobook?.chapters?.size ?: 0) > 1
+    val audiobook = playerState.currentAudiobook ?: return
 
-    if (libraryState.isInitializing) {
-        Log.d("MainScreen", " Audiobook is initializing")
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarMessage by viewModel.snackbarMessage.collectAsState()
 
-        return
-    }
 
-    val audiobook = playerState.currentAudiobook
-
-    if (audiobook != null) {
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(innerPadding)
                 .padding(WindowInsets.safeDrawing.asPaddingValues())
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
 
-            Spacer(Modifier.weight(0.5f))
-
-            // title + chapter
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = playerState.currentBookTitle.ifEmpty { playerState.chapterTitle },
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
             )
 
             if (hasChapters) {
@@ -194,7 +176,7 @@ fun MainScreen(
                     text = playerState.chapterTitle.ifEmpty {
                         "Chapter ${playerState.currentChapterIndex + 1}"
                     },
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
@@ -204,41 +186,39 @@ fun MainScreen(
 
             Spacer(Modifier.weight(1f))
 
-            // cover art
             Card(
                 modifier = Modifier
                     .size(coverSize)
-                    .shadow(8.dp, shape = RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    .shadow(12.dp, shape = RoundedCornerShape(20.dp)),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
                 CoverArt(
                     coverBitmap = playerState.currentCoverBitmap,
                     size = coverSize,
                     enabled = true,
-                    onPickCover = onPickCover
+                    onPickCover = onPickCover,
                 )
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.weight(2f))
 
-            // seek bar
             SeekBarControl(
                 controller = controller,
                 currentPosition = playerState.currentPosition,
                 duration = playerState.duration,
                 playbackSpeed = playerState.playbackSpeed,
-                onPositionChange = { viewModel.updatePlayerState(currentPosition = it) }
+                onPositionChange = { viewModel.updatePlayerState(currentPosition = it) },
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(16.dp))
 
             PlayerControls(
                 controller = controller,
                 isPlaying = playerState.isPlaying,
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(16.dp))
 
             PlayerBottomControls(
                 playbackSpeed = playerState.playbackSpeed,
@@ -248,30 +228,32 @@ fun MainScreen(
                 onSpeedClick = { showSpeedDialog = true },
                 onSleepTimerClick = { showSleepTimerDialog = true },
                 onSaveNote = { chapter, pos, text ->
-                    viewModel.saveNote(playerState.currentAudiobook?.id ?: "", chapter, pos, text)
+                    viewModel.saveNote(audiobook.id, chapter, pos, text)
                 },
                 currentChapterIndex = playerState.currentChapterIndex,
                 currentPositionMs = playerState.currentPosition,
                 currentChapterTitle = playerState.chapterTitle,
-
             )
 
-            Spacer(Modifier.weight(0.5f))
+            Spacer(Modifier.height(8.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBackToLibrary) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back to library"
+                        contentDescription = "Back to library",
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 IconButton(
                     onClick = { viewModel.toggleChapterList() },
-                    enabled = hasChapters
+                    enabled = hasChapters,
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.List,
@@ -279,14 +261,10 @@ fun MainScreen(
                         tint = if (hasChapters)
                             MaterialTheme.colorScheme.onSurface
                         else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
                     )
                 }
-
             }
-
-            Spacer(Modifier.height(8.dp))
         }
     }
 }
-

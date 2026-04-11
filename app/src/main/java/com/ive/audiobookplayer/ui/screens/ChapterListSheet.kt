@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -31,8 +33,11 @@ import com.ive.audiobookplayer.utils.TimeFormatter
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clip
 import androidx.wear.compose.material.Icon
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChapterListSheet(
@@ -42,37 +47,52 @@ fun ChapterListSheet(
     onChapterSelected: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(currentChapterIndex) {
+        listState.scrollToItem(currentChapterIndex)
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 32.dp)
         ) {
-            Text(
-                text = audiobook.title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            Text(
-                text = "${audiobook.chapters.size} chapters",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text(
+                    text = audiobook.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "${audiobook.chapters.size} chapters",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
+            HorizontalDivider(
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
 
-            HorizontalDivider()
+            val bookmark = bookmarks[audiobook.id]
 
-            LazyColumn {
+            LazyColumn(state = listState) {
                 itemsIndexed(audiobook.chapters) { index, chapter ->
                     val isCurrentChapter = index == currentChapterIndex
+                    val isCompleted = bookmark != null && index < bookmark.chapterIndex
+                    val isCurrent = index == bookmark?.chapterIndex
+                    val chapterProgress = if (isCurrent && chapter.durationMs > 0L) {
+                        (bookmark!!.positionMs.toFloat() / chapter.durationMs).coerceIn(0f, 1f)
+                    } else null
 
                     Row(
                         modifier = Modifier
@@ -81,67 +101,88 @@ fun ChapterListSheet(
                             .background(
                                 if (isCurrentChapter)
                                     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                else
-                                    Color.Transparent
+                                else Color.Transparent
                             )
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Box(
                             modifier = Modifier.size(32.dp),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             if (isCurrentChapter) {
                                 Icon(
                                     Icons.Default.PlayArrow,
                                     contentDescription = "Now playing",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(20.dp),
                                 )
                             } else {
                                 Text(
                                     text = "${index + 1}",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
 
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
                             Text(
                                 text = chapter.title,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (isCurrentChapter)
                                     MaterialTheme.colorScheme.primary
+                                else if (isCompleted)
+                                    MaterialTheme.colorScheme.onSurfaceVariant
                                 else
                                     MaterialTheme.colorScheme.onSurface,
                                 maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
                             )
+
                             if (chapter.durationMs > 0L) {
-                                Text(
-                                    text = TimeFormatter.formatTime(chapter.durationMs),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(
+                                        text = TimeFormatter.formatTime(chapter.durationMs),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    if (chapterProgress != null) {
+                                        LinearProgressIndicator(
+                                            progress = { chapterProgress },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(2.dp)
+                                                .clip(RoundedCornerShape(1.dp)),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                        )
+                                    }
+                                }
                             }
                         }
 
-                        val bookmark = bookmarks[audiobook.id]
-                        if (bookmark != null && index < bookmark.chapterIndex) {
+                        if (isCompleted) {
                             Icon(
-                                Icons.Default.CheckCircle,
+                                Icons.Outlined.CheckCircle,
                                 contentDescription = "Completed",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                modifier = Modifier.size(16.dp),
                             )
                         }
                     }
 
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                     )
                 }
             }

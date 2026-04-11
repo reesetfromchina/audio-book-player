@@ -14,7 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -91,7 +90,7 @@ fun NoteBottomSheet(
             OutlinedTextField(
                 value = noteText,
                 onValueChange = { if (it.length <= characterLimit) noteText = it },
-                placeholder = { Text("Jot down a thought...") },
+                placeholder = { Text("Write down a thought...") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),

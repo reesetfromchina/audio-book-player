@@ -12,8 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.Card
@@ -35,9 +33,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ive.audiobookplayer.database.NoteEntity
 import com.ive.audiobookplayer.model.Audiobook
-import com.ive.audiobookplayer.utils.formatDuration
-import java.util.Date
-import java.util.Locale
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.sp
+import com.ive.audiobookplayer.utils.TimeFormatter
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,54 +59,138 @@ fun NotesBottomSheet(
     onNoteClicked: (NoteEntity) -> Unit,
     onDeleteNote: (NoteEntity) -> Unit,
 ) {
-
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .navigationBarsPadding()
         ) {
-            // header
-            Text(
-                text = "Notes",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                Text(
+                    text = "Notes",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "${notes.size} saved items",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
             )
+            Spacer(Modifier.height(8.dp))
 
-            Text(
-                text = "${notes.size} saved items",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-            // notes list
             if (notes.isEmpty()) {
                 EmptyNotesView()
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     items(notes, key = { it.id }) { note ->
-                        NoteItem(
+                        SwipeToDeleteNoteItem(
                             note = note,
                             audiobook = audiobook,
                             onClick = { onNoteClicked(note) },
-                            onDelete = { onDeleteNote(note) }
+                            onDelete = { onDeleteNote(note) },
                         )
-
                     }
                 }
             }
 
-
+            Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+
+private val SWIPE_THRESHOLD = 60.dp
+private val DELETE_REVEAL_WIDTH = 68.dp
+
+@Composable
+fun SwipeToDeleteNoteItem(
+    note: NoteEntity,
+    audiobook: Audiobook,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    val revealPx = with(androidx.compose.ui.platform.LocalDensity.current) { DELETE_REVEAL_WIDTH.toPx() }
+    val thresholdPx = with(androidx.compose.ui.platform.LocalDensity.current) { SWIPE_THRESHOLD.toPx() }
+
+    val animatedOffset by animateFloatAsState(
+        targetValue = offsetX,
+        animationSpec = tween(durationMillis = 200),
+        label = "swipe_offset",
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.errorContainer),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier
+                    .padding(end = 12.dp)
+                    .size(36.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.DeleteOutline,
+                    contentDescription = "Delete note",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
+        NoteItem(
+            note = note,
+            audiobook = audiobook,
+            onClick = {
+                if (animatedOffset < -thresholdPx / 2) {
+
+                    offsetX = 0f
+                } else {
+                    onClick()
+                }
+            },
+            modifier = Modifier
+                .offset { IntOffset(animatedOffset.roundToInt(), 0) }
+                .draggable(
+                    orientation = Orientation.Horizontal,
+                    state = rememberDraggableState { delta ->
+                        val newOffset = offsetX + delta
+                        offsetX = newOffset.coerceIn(-revealPx, 0f)
+                    },
+                    onDragStopped = {
+                        offsetX = if (offsetX < -thresholdPx) -revealPx else 0f
+                    },
+                ),
+        )
     }
 }
 
@@ -104,184 +199,121 @@ fun NoteItem(
     note: NoteEntity,
     audiobook: Audiobook,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    modifier: Modifier = Modifier,
 ) {
     val chapter = audiobook.chapters.getOrNull(note.chapterIndex)
+    val timeStr = TimeFormatter.formatTime(note.positionMs)
+
+    val timeBadgeBg = MaterialTheme.colorScheme.primaryContainer
+    val timeBadgeText = MaterialTheme.colorScheme.onPrimaryContainer
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            width = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // header row with chapter info and delete button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Filled.EditNote,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Chapter ${note.chapterIndex + 1}",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium
-                    )
-                    if (chapter != null) {
-                        Text(
-                            text = "•",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = chapter.title,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                // delete button
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.DeleteOutline,
-                        contentDescription = "Delete note",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                    )
-                }
-            }
-
-            // note text content
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ),
-                shape = RoundedCornerShape(8.dp)
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(timeBadgeBg)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = note.noteText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(10.dp),
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
+                    text = timeStr,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = timeBadgeText,
+                    letterSpacing = 0.5.sp,
+                )
+                Text(
+                    text = "Ch ${note.chapterIndex + 1}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = timeBadgeText.copy(alpha = 0.7f),
                 )
             }
 
-            // footer row with position and date
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                // position with icon
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Filled.AccessTime,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = formatDuration(note.positionMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                Text(
+                    text = note.noteText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 18.sp,
+                )
 
-                // date with icon
                 Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Filled.CalendarToday,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = formatRelativeDate(note.createdAt),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (chapter != null) {
+                        Text(
+                            text = chapter.title,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Text(
+                            text = "·",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
                 }
             }
         }
     }
 }
 
-
-
 @Composable
 fun EmptyNotesView() {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(32.dp),
-        contentAlignment = Alignment.Center
+            .padding(vertical = 48.dp, horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                Icons.Filled.EditNote,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-            Text(
-                text = "No notes yet",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "Tap the bookmark button while listening to add notes",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-
-
-fun formatRelativeDate(timestamp: Long): String {
-    val now = System.currentTimeMillis()
-    val diff = now - timestamp
-
-    return when {
-        diff < 60_000 -> "Just now"
-        diff < 3600_000 -> "${diff / 60_000} min ago"
-        diff < 86400_000 -> "${diff / 3600_000} hour${if (diff / 3600_000 > 1) "s" else ""} ago"
-        diff < 604800_000 -> "${diff / 86400_000} day${if (diff / 86400_000 > 1) "s" else ""} ago"
-        else -> java.text.SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(timestamp))
+        Icon(
+            imageVector = Icons.Filled.EditNote,
+            contentDescription = null,
+            modifier = Modifier.size(40.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+        )
+        Text(
+            text = "No notes yet",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "Tap the bookmark button while listening to add notes",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center,
+        )
     }
 }
