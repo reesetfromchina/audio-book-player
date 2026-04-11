@@ -16,19 +16,16 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -50,7 +47,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import com.ive.audiobookplayer.ui.componenets.CoverArt
-import com.ive.audiobookplayer.ui.componenets.NoteDialog
 import com.ive.audiobookplayer.ui.componenets.PlayerBottomControls
 import com.ive.audiobookplayer.ui.componenets.PlayerControls
 import com.ive.audiobookplayer.ui.componenets.SeekBarControl
@@ -151,22 +147,6 @@ fun MainScreen(
         }
     }
 
-    LaunchedEffect(snackbarMessage) {
-        snackbarMessage?.let { message ->
-            val result = snackbarHostState.showSnackbar(
-                message = message,
-                actionLabel = if (message.contains("Bookmark")) "Undo" else null,
-                duration = SnackbarDuration.Short
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                // Handle undo if needed
-            }
-//            viewModel.clearSnackbarMessage()
-        }
-    }
-
-
-
     val configuration = LocalConfiguration.current
     val coverSize = (configuration.screenHeightDp * 0.38f).dp.coerceIn(140.dp, 260.dp)
     val bookmark = libraryState.bookmarks[playerState.currentAudiobook?.id]
@@ -195,32 +175,6 @@ fun MainScreen(
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
-
-            val currentAudiobookId = audiobook.id
-            val currentChapter = playerState.currentAudiobook?.chapters?.getOrNull(playerState.currentChapterIndex)
-            val currentPositionMs = playerState.currentPosition
-
-
-            if (showNoteDialog) {
-                NoteDialog(
-                    audiobookId = currentAudiobookId,
-                    chapterIndex = currentChapter?.index ?: 0,
-                    positionMs = currentPositionMs,
-                    chapterTitle = currentChapter?.title ?: "",
-                    onDismiss = { showNoteDialog = false },
-                    onSave = { noteText ->
-                        viewModel.saveNote(
-                            audiobookId = currentAudiobookId,
-                            chapterIndex = currentChapter?.index ?: 0,
-                            positionMs = currentPositionMs,
-                            noteText = noteText
-                        )
-                        showNoteDialog = false
-                    }
-                )
-            }
-
-
 
             Spacer(Modifier.weight(0.5f))
 
@@ -292,7 +246,14 @@ fun MainScreen(
                 audiobook = playerState.currentAudiobook,
                 bookmark = bookmark,
                 onSpeedClick = { showSpeedDialog = true },
-                onSleepTimerClick = { showSleepTimerDialog = true }
+                onSleepTimerClick = { showSleepTimerDialog = true },
+                onSaveNote = { chapter, pos, text ->
+                    viewModel.saveNote(playerState.currentAudiobook?.id ?: "", chapter, pos, text)
+                },
+                currentChapterIndex = playerState.currentChapterIndex,
+                currentPositionMs = playerState.currentPosition,
+                currentChapterTitle = playerState.chapterTitle,
+
             )
 
             Spacer(Modifier.weight(0.5f))
@@ -304,7 +265,7 @@ fun MainScreen(
             ) {
                 IconButton(onClick = onBackToLibrary) {
                     Icon(
-                        Icons.AutoMirrored.Filled.LibraryBooks,
+                        Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back to library"
                     )
                 }
@@ -321,14 +282,7 @@ fun MainScreen(
                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                 }
-                IconButton(
-                    onClick = { showNoteDialog = true }
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.MenuBook,
-                        contentDescription = "Add note"
-                    )
-                }
+
             }
 
             Spacer(Modifier.height(8.dp))

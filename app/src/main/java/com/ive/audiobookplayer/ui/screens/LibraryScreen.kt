@@ -106,12 +106,15 @@ fun LibraryScreen(
                 is LibraryEvent.ImportSuccess -> {
                     Toast.makeText(context, "Import successful", Toast.LENGTH_SHORT).show()
                 }
+
                 is LibraryEvent.ImportError -> {
                     Toast.makeText(context, "Import failed", Toast.LENGTH_SHORT).show()
                 }
+
                 is LibraryEvent.ExportSuccess -> {
                     Toast.makeText(context, "Export successful", Toast.LENGTH_SHORT).show()
                 }
+
                 is LibraryEvent.ExportError -> {
                     Toast.makeText(context, "Export failed", Toast.LENGTH_SHORT).show()
                 }
@@ -240,7 +243,7 @@ fun LibraryScreen(
                     onAudiobookSelected = onAudiobookSelected,
                     onResetProgress = { viewModel.resetProgress(it) },
                     onFinishedAudiobook = { viewModel.markAsFinished(it) },
-                    onViewNotes = {audiobook ->
+                    onViewNotes = { audiobook ->
                         selectedAudiobookForNotes = audiobook
                         showNotesSheet = true
                     }
@@ -259,7 +262,11 @@ fun LibraryScreen(
                         resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
                         onResetProgress = { viewModel.resetProgress(it) },
-                        onFinishedAudiobook = { viewModel.markAsFinished(it) }
+                        onFinishedAudiobook = { viewModel.markAsFinished(it) },
+                        onViewNote = { audiobook ->
+                            selectedAudiobookForNotes = audiobook
+                            showNotesSheet = true
+                        }
 
 
                     )
@@ -270,7 +277,11 @@ fun LibraryScreen(
                         resolveCover = resolveCover,
                         onAudiobookSelected = onAudiobookSelected,
                         onResetProgress = { viewModel.resetProgress(it) },
-                        onFinishedAudiobook = { viewModel.markAsFinished(it) }
+                        onFinishedAudiobook = { viewModel.markAsFinished(it) },
+                        onViewNote = { audiobook ->
+                            selectedAudiobookForNotes = audiobook
+                            showNotesSheet = true
+                        }
 
 
                     )
@@ -282,8 +293,11 @@ fun LibraryScreen(
                         onAudiobookSelected = onAudiobookSelected,
                         isFinished = true,
                         onResetProgress = { viewModel.resetProgress(it) },
-                        onFinishedAudiobook = { viewModel.markAsFinished(it) }
-
+                        onFinishedAudiobook = { viewModel.markAsFinished(it) },
+                        onViewNote = { audiobook ->
+                            selectedAudiobookForNotes = audiobook
+                            showNotesSheet = true
+                        }
                     )
                 }
             }
@@ -311,7 +325,7 @@ fun LibraryScreen(
 //                    viewModel.deleteNote(note)
                 },
 
-            )
+                )
         }
     }
 }
@@ -325,6 +339,7 @@ private fun LazyListScope.librarySection(
     isFinished: Boolean = false,
     onResetProgress: (Audiobook) -> Unit,
     onFinishedAudiobook: (Audiobook) -> Unit,
+    onViewNote: (Audiobook) -> Unit,
 ) {
     if (books.isEmpty()) return
     val key = title.lowercase().replace(" ", "_")
@@ -341,7 +356,7 @@ private fun LazyListScope.librarySection(
             onClick = { onAudiobookSelected(book) },
             onResetProgress = { onResetProgress(book) },
             onFinishedAudiobook = { onFinishedAudiobook(book) },
-            onViewNote = { }
+            onViewNote = { onViewNote(book) }
         )
     }
     item(key = "spacer_$key") {
@@ -375,24 +390,6 @@ fun LibrarySectionHeader(title: String, count: Int) {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AudiobookCard(
@@ -413,7 +410,7 @@ fun AudiobookCard(
     var selectedAudiobookForNotes by remember { mutableStateOf<Audiobook?>(null) }
 
 
-    Box{
+    Box {
         Card(
             modifier = Modifier
                 .fillMaxWidth()

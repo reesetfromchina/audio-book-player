@@ -76,7 +76,7 @@ fun AudioBookTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkAudiobookScheme else LightAudiobookScheme
+    val colorScheme = if (darkTheme) DarkScheme else LightScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

@@ -109,8 +109,7 @@ class MainActivity : ComponentActivity() {
                                 viewModel = viewModel,
                                 onBackToLibrary = { navController.popBackStack() },
                                 onPickCover = { imagePicker.launch(arrayOf("image/*")) },
-                                navController = navController)
-                        }
+                            )}
                     }
                 }
             }

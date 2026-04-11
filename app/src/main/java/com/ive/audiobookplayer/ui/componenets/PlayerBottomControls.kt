@@ -7,6 +7,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -22,8 +26,16 @@ fun PlayerBottomControls(
     audiobook: Audiobook?,
     bookmark: BookmarkEntry?,
     onSpeedClick: () -> Unit,
-    onSleepTimerClick: () -> Unit
+    onSleepTimerClick: () -> Unit,
+    currentChapterIndex: Int,
+    currentPositionMs: Long,
+    currentChapterTitle: String,
+    onSaveNote: (Int, Long, String) -> Unit // chapter, position, text
 ) {
+
+    var showNoteDialog by remember { mutableStateOf(false) }
+
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -48,6 +60,10 @@ fun PlayerBottomControls(
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            TextButton(onClick = { showNoteDialog = true}) {
+                Text("Take a note")
+            }
+
         }
 
         // remaining time
@@ -67,6 +83,20 @@ fun PlayerBottomControls(
                     textAlign = TextAlign.Center
                 )
             }
+        }
+
+        if (showNoteDialog) {
+            NoteBottomSheet(
+//                audiobookId = audiobook?.id ?: "",
+//                chapterIndex = currentChapterIndex,
+                positionMs = currentPositionMs,
+                onDismiss = { showNoteDialog = false },
+                onSave = { noteText ->
+                    onSaveNote(currentChapterIndex, currentPositionMs, noteText)
+                    showNoteDialog = false
+                },
+                chapterTitle = currentChapterTitle
+            )
         }
     }
 }
