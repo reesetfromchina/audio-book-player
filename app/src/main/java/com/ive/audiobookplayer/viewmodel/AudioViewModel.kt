@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import com.ive.audiobookplayer.repository.CoverArtRepository
 import com.ive.audiobookplayer.utils.CoverArtExtractor
 import androidx.core.net.toUri
+import com.ive.audiobookplayer.database.NoteEntity
 import com.ive.audiobookplayer.utils.SleepTimerState
 import com.ive.audiobookplayer.database.toAudiobook
 import com.ive.audiobookplayer.database.toBookmarkEntry
@@ -42,8 +43,10 @@ import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryGroups
 import com.ive.audiobookplayer.model.LibraryState
 import com.ive.audiobookplayer.repository.LibraryRepository
+import com.ive.audiobookplayer.repository.NoteRepository
 import com.ive.audiobookplayer.repository.SettingsRepository
 import com.ive.audiobookplayer.utils.calculateProgress
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.runBlocking
@@ -54,12 +57,12 @@ import java.io.File
 
 class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
-
     private val controllerManager = MediaControllerManager(application)
     private val settingsRepository = SettingsRepository(application)
     private val bookmarkRepository = BookmarkRepository(application)
     private val libraryRepository = LibraryRepository(application)
     private val coverArtRepository = CoverArtRepository(application)
+    private val noteRepository = NoteRepository(application)
 
     private val audiobookScanner = AudiobookScanner(application)
     private val coverArtExtractor = CoverArtExtractor(application)
@@ -72,6 +75,9 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _events = MutableSharedFlow<LibraryEvent>()
     val events = _events.asSharedFlow()
+
+    private val _snackbarMessage = MutableStateFlow<String?>(null)
+    val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
 
     private var bookmarkSaveJob: Job? = null
     private var sleepTimerJob: Job? = null
@@ -487,6 +493,75 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    @OptIn(UnstableApi::class)
+    fun playAudiobookCustom(audiobook: Audiobook, chapterIndex : Int, positionMs: Long) {
+        viewModelScope.launch {
+            isSwitchingBooks = true
+            bookmarkSaveJob?.cancel()
+
+            resetBooks.remove(audiobook.id)
+
+            try {
+
+                val customCoverUri = withContext(Dispatchers.IO) {
+                    coverArtRepository.getCoverUri(audiobook.id)
+                }
+
+                val coverUri = when {
+                    customCoverUri != null -> Uri.parse(customCoverUri)
+                    audiobook.coverUri != null -> audiobook.coverUri.toUri()
+                    else -> null
+                }
+
+
+                controllerManager.playAudiobook(
+                    audiobook,
+                    startChapterIndex = chapterIndex,
+                    startPositionMs = positionMs,
+                    coverUri
+                )
+
+                settingsRepository.saveLastBookId(audiobook.id)
+                _playerState.value.controller?.setPlaybackSpeed(1f)
+                _playerState.update {
+                    it.copy(
+                        currentAudiobook = audiobook,
+                        currentBookTitle = audiobook.title,
+                        currentChapterIndex = chapterIndex,
+                        currentPosition = positionMs,
+                        playbackSpeed = 1f,
+                    )
+                }
+
+                loadCoverArt(audiobook)
+                delay(1000)
+                startPeriodicBookmarkSave()
+            } finally {
+                isSwitchingBooks = false
+            }
+        }
+    }
+
+
+    fun seekTo(chapterIndex: Int, positionMs: Long) {
+
+        val controller = _playerState.value
+            .controller ?: return
+
+        viewModelScope.launch {
+            controller.seekTo(chapterIndex, positionMs)
+
+            _playerState.update {
+                it.copy(
+                    currentChapterIndex = chapterIndex,
+                    currentPosition = positionMs
+                )
+            }
+        }
+    }
+
+
     fun updatePlayerState(
         isPlaying: Boolean? = null,
         currentTitle: String? = null,
@@ -750,6 +825,26 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         data class ExportError(val message: String) : LibraryEvent()
     }
 
+    fun saveNote(
+        audiobookId: String,
+        chapterIndex: Int,
+        positionMs: Long,
+        noteText : String,
+    ){
+        viewModelScope.launch {
+            try {
+
+                noteRepository.addNote(audiobookId, chapterIndex, positionMs, noteText)
+                _snackbarMessage.value = "Note saved"
+            } catch (e: Exception){
+                _snackbarMessage.value = "Failed to save note"
+            }
+        }
+    }
+
+     fun getNotesForAudiobook(audiobookId: String) : Flow<List<NoteEntity>> {
+        return noteRepository.getNotesForBook(audiobookId)
+    }
 
     override fun onCleared() {
         super.onCleared()

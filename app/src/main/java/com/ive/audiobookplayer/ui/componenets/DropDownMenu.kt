@@ -41,7 +41,8 @@ fun DropdownMenuComponent(
     bookmarkEntry: BookmarkEntry?,
     onResetProgress: () -> Unit,
     onFinishedProgress: () -> Unit,
-    coverUri: Uri?
+    coverUri: Uri?,
+    onViewNotes: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
     var showBottomSheet by remember { mutableStateOf(false) }
@@ -62,6 +63,13 @@ fun DropdownMenuComponent(
             text = { Text("Mark as finished") },
             onClick = {
                 onFinishedProgress()
+                onDismissRequest()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("View notes") },
+            onClick = {
+                onViewNotes()
                 onDismissRequest()
             }
         )

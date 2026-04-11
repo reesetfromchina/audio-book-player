@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(tableName = "audiobooks")
 data class AudiobookEntity(
@@ -43,4 +44,22 @@ data class BookmarkEntity(
     val positionMs: Long,
     val playbackSpeed: Float = 1f,
     val lastPlayedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "notes",
+    foreignKeys = [ForeignKey(
+        entity = AudiobookEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["audiobookId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index("audiobookId")])
+data class NoteEntity(
+    @PrimaryKey
+    val id: String = UUID.randomUUID().toString(),
+    val audiobookId: String,
+    val chapterIndex: Int,
+    val positionMs: Long,
+    val noteText: String,
+    val createdAt : Long = System.currentTimeMillis(),
 )

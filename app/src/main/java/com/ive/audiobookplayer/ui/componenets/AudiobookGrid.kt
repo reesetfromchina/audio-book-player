@@ -22,6 +22,7 @@ fun AudiobookGrid(
     resolveCover: (Audiobook) -> Uri?,
     onResetProgress: (Audiobook) -> Unit,
     onFinishedAudiobook: (Audiobook) -> Unit,
+    onViewNotes: (Audiobook) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
 
@@ -40,7 +41,8 @@ fun AudiobookGrid(
                 coverUri = resolveCover(book),
                 onClick = { onAudiobookSelected(book) },
                 onResetProgress = {onResetProgress(book)},
-                onFinishedAudiobook = {onFinishedAudiobook(book)}
+                onFinishedAudiobook = {onFinishedAudiobook(book)},
+                onViewNotes = {onViewNotes(book)}
             )
         }
     }

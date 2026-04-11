@@ -47,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,16 +62,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.datastore.preferences.protobuf.LazyStringArrayList.emptyList
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.ive.audiobookplayer.database.NoteEntity
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryState
 import com.ive.audiobookplayer.ui.componenets.AudiobookGrid
 import com.ive.audiobookplayer.ui.componenets.DropdownMenuComponent
+import com.ive.audiobookplayer.ui.componenets.NotesBottomSheet
 import com.ive.audiobookplayer.utils.calculateProgress
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 import com.ive.audiobookplayer.viewmodel.AudioViewModel.LibraryEvent
+import kotlin.collections.emptyList
 
 @Composable
 fun LibraryScreen(
@@ -80,14 +86,19 @@ fun LibraryScreen(
     onPickFolder: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    navController: NavController
 ) {
     val listState = rememberLazyListState()
     val context = LocalContext.current
+
+    var showNotesSheet by remember { mutableStateOf(false) }
+    var selectedAudiobookForNotes by remember { mutableStateOf<Audiobook?>(null) }
 
     val resolveCover = remember(viewModel) {
         { audiobook: Audiobook -> viewModel.resolveCoverUri(audiobook) }
     }
 
+    var selectedNoteToPlay by remember { mutableStateOf<NoteEntity?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -106,6 +117,20 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+
+    LaunchedEffect(selectedNoteToPlay) {
+        val note = selectedNoteToPlay ?: return@LaunchedEffect
+
+        viewModel.playAudiobookCustom(
+            selectedAudiobookForNotes!!,
+            note.chapterIndex,
+            note.positionMs
+        )
+
+        navController.navigate("player")
+
+        selectedNoteToPlay = null
     }
 
     Column(
@@ -215,6 +240,10 @@ fun LibraryScreen(
                     onAudiobookSelected = onAudiobookSelected,
                     onResetProgress = { viewModel.resetProgress(it) },
                     onFinishedAudiobook = { viewModel.markAsFinished(it) },
+                    onViewNotes = {audiobook ->
+                        selectedAudiobookForNotes = audiobook
+                        showNotesSheet = true
+                    }
                 )
             }
 
@@ -258,6 +287,31 @@ fun LibraryScreen(
                     )
                 }
             }
+
+        }
+
+        if (showNotesSheet && selectedAudiobookForNotes != null) {
+            val notes by viewModel.getNotesForAudiobook(selectedAudiobookForNotes!!.id)
+                .collectAsState(initial = emptyList())
+
+            NotesBottomSheet(
+                audiobook = selectedAudiobookForNotes!!,
+                notes = notes as List<NoteEntity>,
+//                Log.d("Notes", notes.forEach { note -> note?.toString() })
+                onDismiss = {
+                    showNotesSheet = false
+                    selectedAudiobookForNotes = null
+                },
+                onNoteClicked = { note ->
+                    selectedNoteToPlay = note
+                    showNotesSheet = false
+                },
+
+                onDeleteNote = { note ->
+//                    viewModel.deleteNote(note)
+                },
+
+            )
         }
     }
 }
@@ -286,7 +340,8 @@ private fun LazyListScope.librarySection(
             isFinished = isFinished,
             onClick = { onAudiobookSelected(book) },
             onResetProgress = { onResetProgress(book) },
-            onFinishedAudiobook = { onFinishedAudiobook(book) }
+            onFinishedAudiobook = { onFinishedAudiobook(book) },
+            onViewNote = { }
         )
     }
     item(key = "spacer_$key") {
@@ -319,6 +374,25 @@ fun LibrarySectionHeader(title: String, count: Int) {
     Spacer(Modifier.height(4.dp))
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AudiobookCard(
@@ -329,11 +403,15 @@ fun AudiobookCard(
     onClick: () -> Unit,
     onResetProgress: () -> Unit,
     onFinishedAudiobook: () -> Unit,
+    onViewNote: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
 
     val progress = remember(audiobook, bookmark) { calculateProgress(audiobook, bookmark) }
     var expanded by remember { mutableStateOf(false) }
+    var showNotesSheet by remember { mutableStateOf(false) }
+    var selectedAudiobookForNotes by remember { mutableStateOf<Audiobook?>(null) }
+
 
     Box{
         Card(
@@ -462,7 +540,8 @@ fun AudiobookCard(
             bookmarkEntry = bookmark,
             onResetProgress = onResetProgress,
             onFinishedProgress = onFinishedAudiobook,
-            coverUri = coverUri
+            coverUri = coverUri,
+            onViewNotes = onViewNote,
         )
 
     }

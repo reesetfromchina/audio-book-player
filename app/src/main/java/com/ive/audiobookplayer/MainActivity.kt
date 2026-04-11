@@ -97,17 +97,19 @@ class MainActivity : ComponentActivity() {
                                     viewModel.playAudiobook(book)
                                     navController.navigate("player")
                                 },
+                                navController = navController,
                                 onPickFolder = { folderPickerLauncher.launch(null) },
                                 library = libraryState,
                                 onExportBackup = {backupExportLauncher.launch("audiobook_backup.json")},
-                                onImportBackup = { backupImportLauncher.launch(arrayOf("application/json"))}
+                                onImportBackup = { backupImportLauncher.launch(arrayOf("application/json"))},
                             )
                         }
                         composable("player") {
                             MainScreen(
                                 viewModel = viewModel,
                                 onBackToLibrary = { navController.popBackStack() },
-                                onPickCover = { imagePicker.launch(arrayOf("image/*")) })
+                                onPickCover = { imagePicker.launch(arrayOf("image/*")) },
+                                navController = navController)
                         }
                     }
                 }

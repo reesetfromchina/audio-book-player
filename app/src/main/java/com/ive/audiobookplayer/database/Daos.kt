@@ -1,6 +1,7 @@
 package com.ive.audiobookplayer.database
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -62,4 +63,18 @@ interface BookmarkDao{
     suspend fun deleteBookmark(audiobookId: String)
 
 
+}
+@Dao
+interface NoteDao{
+    @Query("SELECT * FROM notes WHERE audiobookId = :audiobookId ORDER BY positionMs ASC")
+    fun getNotesForBook(audiobookId: String) : Flow<List<NoteEntity>>
+
+    @Insert
+    suspend fun insertNote(note: NoteEntity)
+
+    @Delete
+    suspend fun deleteNote(note: NoteEntity)
+
+    @Query("DELETE FROM notes where audiobookId = :audiobookId")
+    suspend fun deleteAllNotesForBook(audiobookId: String)
 }
