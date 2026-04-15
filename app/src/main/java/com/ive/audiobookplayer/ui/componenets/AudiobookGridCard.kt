@@ -95,6 +95,8 @@ fun AudiobookGridCard(
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data(coverUri)
                                 .crossfade(true)
+                                .memoryCacheKey(coverUri.toString())
+                                .diskCacheKey(coverUri.toString())
                                 .build(),
                             contentDescription = "Cover art for ${audiobook.title}",
                             contentScale = ContentScale.Crop,

@@ -31,6 +31,8 @@ import kotlinx.coroutines.launch
 import com.ive.audiobookplayer.repository.CoverArtRepository
 import com.ive.audiobookplayer.utils.CoverArtExtractor
 import androidx.core.net.toUri
+import coil.Coil
+import coil.annotation.ExperimentalCoilApi
 import com.ive.audiobookplayer.database.NoteEntity
 import com.ive.audiobookplayer.utils.SleepTimerState
 import com.ive.audiobookplayer.database.toAudiobook
@@ -281,6 +283,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @kotlin.OptIn(ExperimentalCoilApi::class)
     fun importBackup(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -288,8 +291,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                     .openInputStream(uri)?.use { it.bufferedReader().readText() } ?: return@launch
                 val backup = Json.decodeFromString<AppBackup>(json)
                 val currentAudiobooks = libraryRepository.getAllAudiobookEntities()
-
-                // restore bookmarks
+                // restore bookmarks and notes
                 bookmarkRepository.importBackup(backup, currentAudiobooks)
 
                 // restore custom covers separately using coverArtRepository
@@ -321,6 +323,14 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 resolvedCoverUris.clear()
+                val currentBooks = _libraryState.value.audiobooks
+                preloadCoverUris(currentBooks)
+
+                withContext(Dispatchers.Main) {
+                    Coil.imageLoader(getApplication()).memoryCache?.clear()
+                    Coil.imageLoader(getApplication()).diskCache?.clear()
+                }
+
                 _events.emit(LibraryEvent.ImportSuccess)
                 Log.d("Backup", "Import successful — ${backup.bookmarks.size} bookmarks restored")
             } catch (e: Exception) {

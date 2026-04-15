@@ -445,6 +445,8 @@ fun AudiobookCard(
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data(coverUri)
                                 .crossfade(true)
+                                .memoryCacheKey(coverUri.toString())
+                                .diskCacheKey(coverUri.toString())
                                 .build(),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,

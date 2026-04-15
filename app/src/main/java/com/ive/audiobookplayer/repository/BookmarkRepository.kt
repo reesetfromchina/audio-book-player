@@ -4,8 +4,8 @@ import android.content.Context
 import com.ive.audiobookplayer.database.AppDatabase
 import com.ive.audiobookplayer.database.AudiobookEntity
 import com.ive.audiobookplayer.database.BookmarkEntity
+import com.ive.audiobookplayer.database.NoteEntity
 import com.ive.audiobookplayer.model.AppBackup
-import com.ive.audiobookplayer.model.BookmarkBackup
 import com.ive.audiobookplayer.model.BookmarkEntry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.map
 class BookmarkRepository(context: Context) {
 
     private val bookmarkDao = AppDatabase.getInstance(context).bookmarkDao()
-    private val audiobookDao = AppDatabase.getInstance(context).audiobookDao()
+    private val noteDao = AppDatabase.getInstance(context).noteDao()
 
     val bookmarks: Flow<Map<String, BookmarkEntry>> =
         bookmarkDao.getAllBookmarks().map { list ->
@@ -70,7 +70,10 @@ class BookmarkRepository(context: Context) {
 //        )
 //    }
 
-    suspend fun importBackup(backup: AppBackup, currentAudiobooks: List<AudiobookEntity>) {
+    suspend fun importBackup(
+        backup: AppBackup,
+        currentAudiobooks: List<AudiobookEntity>,
+    ) {
         backup.bookmarks.forEach { bookmarkBackup ->
             val matchedId = when {
                 currentAudiobooks.any { it.id == bookmarkBackup.audiobookId } ->
@@ -89,6 +92,27 @@ class BookmarkRepository(context: Context) {
                 )
             )
         }
+
+        backup.notes.forEach { noteBackup ->
+            val matchedId = when {
+                currentAudiobooks.any { it.id == noteBackup.audiobookId } ->
+                    noteBackup.audiobookId
+
+                else ->
+                    currentAudiobooks.find { it.title == noteBackup.audiobookId }?.id
+            } ?: return@forEach
+
+            noteDao.insertNote(
+                NoteEntity(
+                    audiobookId = matchedId,
+                    chapterIndex = noteBackup.chapterIndex,
+                    positionMs = noteBackup.positionMS,
+                    noteText = noteBackup.noteText,
+                )
+            )
+        }
+
+
     }
 
     suspend fun deleteBookmark(audiobookId: String) = bookmarkDao.deleteBookmark(audiobookId)
