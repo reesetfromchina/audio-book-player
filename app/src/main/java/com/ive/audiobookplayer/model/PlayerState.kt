@@ -27,5 +27,5 @@ data class LibraryState(
     val isScanning: Boolean = false,
     val isBackgroundScanning: Boolean = false,
     val isInitializing: Boolean = true,
-    val isGridView: Boolean = true,
+    val isGridView: Boolean = false,
 )

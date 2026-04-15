@@ -77,4 +77,7 @@ interface NoteDao{
 
     @Query("DELETE FROM notes where audiobookId = :audiobookId")
     suspend fun deleteAllNotesForBook(audiobookId: String)
+
+    @Query("SELECT * FROM notes")
+    suspend fun getAllNotesList() : List<NoteEntity>
 }

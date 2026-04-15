@@ -31,4 +31,6 @@ class NoteRepository(context: Context) {
 
     suspend fun deleteAllNotesForBook(audiobookId: String) =
         noteDao.deleteAllNotesForBook(audiobookId)
+
+    suspend fun getAllNotes() : List<NoteEntity> = noteDao.getAllNotesList()
 }

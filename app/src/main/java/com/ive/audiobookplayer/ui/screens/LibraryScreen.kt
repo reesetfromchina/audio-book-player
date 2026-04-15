@@ -507,13 +507,14 @@ fun AudiobookCard(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            val minutes = (bookmark.positionMs / 1000) / 60
+                            val hours = (bookmark.positionMs / 1000) / 3600
+                            val minutes = ((bookmark.positionMs / 1000) % 3600) / 60
                             val seconds = (bookmark.positionMs / 1000) % 60
+
                             Text(
                                 if (isFinished) "Finished"
-                                else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(
-                                    minutes, seconds
-                                ),
+                                else if (hours > 0) "Ch.${bookmark.chapterIndex + 1} — %02d:%02d:%02d".format(hours, minutes, seconds)
+                                else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(minutes, seconds),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

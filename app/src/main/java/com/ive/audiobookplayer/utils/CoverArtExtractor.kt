@@ -38,11 +38,36 @@ class CoverArtExtractor(private val context: Context) {
         return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
     }
 
-    private fun calculateSampleSize(width: Int, height: Int, targetSize: Int) : Int {
+    fun decodeBitmapFromUri(uri: Uri, targetSize: Int = 512): Bitmap? {
+        return try {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+
+            options.inSampleSize = if (options.outWidth <= targetSize && options.outHeight <= targetSize) {
+                1
+            } else {
+                calculateSampleSize(options.outWidth, options.outHeight, targetSize)
+            }
+
+            options.inJustDecodeBounds = false
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+        } catch (e: Exception) {
+            Log.e("CoverArt", "Failed to decode image: ${e.message}")
+            null
+        }
+    }
+
+    private fun calculateSampleSize(width: Int, height: Int, targetSize: Int): Int {
         var sampleSize = 1
-        while( width / sampleSize > targetSize || height/sampleSize > targetSize){
-            sampleSize*=2
+        while (width / sampleSize > targetSize || height / sampleSize > targetSize) {
+            sampleSize *= 2
         }
         return sampleSize
     }
+
+
 }

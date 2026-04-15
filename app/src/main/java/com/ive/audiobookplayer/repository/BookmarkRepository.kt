@@ -48,24 +48,27 @@ class BookmarkRepository(context: Context) {
 
     suspend fun getAllBookmarksList(): List<BookmarkEntity> = bookmarkDao.getAllBookmarksList()
 
-    suspend fun exportBackup(): AppBackup {
-        val allBookmarks = bookmarkDao.getAllBookmarksList()
-        val allAudiobooks = audiobookDao.getAllAudiobooksList()
-
-        return AppBackup(
-            bookmarks = allBookmarks.map { bookmark ->
-                val title = allAudiobooks.find { it.id == bookmark.audiobookId }?.title ?: ""
-                BookmarkBackup(
-                    bookTitle = title,
-                    audiobookId = bookmark.audiobookId,
-                    chapterIndex = bookmark.chapterIndex,
-                    positionMS = bookmark.positionMs,
-                    playbackSpeed = bookmark.playbackSpeed,
-                    lastPlayedAt = bookmark.lastPlayedAt,
-                )
-            }
-        )
-    }
+//    suspend fun exportBackup(): AppBackup {
+//        val allBookmarks = bookmarkDao.getAllBookmarksList()
+//        val allAudiobooks = audiobookDao.getAllAudiobooksList()
+//
+//        return AppBackup(
+//            bookmarks = allBookmarks.map { bookmark ->
+//                val title = allAudiobooks.find { it.id == bookmark.audiobookId }?.title ?: ""
+//                BookmarkBackup(
+//                    bookTitle = title,
+//                    audiobookId = bookmark.audiobookId,
+//                    chapterIndex = bookmark.chapterIndex,
+//                    positionMS = bookmark.positionMs,
+//                    playbackSpeed = bookmark.playbackSpeed,
+//                    lastPlayedAt = bookmark.lastPlayedAt,
+//                )
+//            },
+//            version = TODO(),
+//            exportDate = TODO(),
+//            notes = TODO()
+//        )
+//    }
 
     suspend fun importBackup(backup: AppBackup, currentAudiobooks: List<AudiobookEntity>) {
         backup.bookmarks.forEach { bookmarkBackup ->

@@ -5,8 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.util.Base64
@@ -42,6 +40,7 @@ import com.ive.audiobookplayer.model.BookmarkBackup
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryGroups
 import com.ive.audiobookplayer.model.LibraryState
+import com.ive.audiobookplayer.model.NoteBackup
 import com.ive.audiobookplayer.repository.LibraryRepository
 import com.ive.audiobookplayer.repository.NoteRepository
 import com.ive.audiobookplayer.repository.SettingsRepository
@@ -49,8 +48,8 @@ import com.ive.audiobookplayer.utils.calculateProgress
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -81,15 +80,16 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private var bookmarkSaveJob: Job? = null
     private var sleepTimerJob: Job? = null
-    private val sleepTimerReceiver = object : BroadcastReceiver(){
-        override fun onReceive(context: Context, intent : Intent){
-            if (intent.action == "audiobookplayer.SLEEP_TIMER_FIRED"){
+    private val sleepTimerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == "audiobookplayer.SLEEP_TIMER_FIRED") {
                 _playerState.update {
                     it.copy(sleepTimerEndTime = 0L, sleepTimerLabel = "")
                 }
             }
         }
     }
+
     init {
 
         // register receiver
@@ -142,7 +142,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                                 bookmarkRepository.getBookmark(lastId)
                             }
 
-                            val customCoverUri = withContext(Dispatchers.IO){
+                            val customCoverUri = withContext(Dispatchers.IO) {
                                 coverArtRepository.getCoverUri(lastId)
                             }
 
@@ -159,7 +159,8 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                                     currentChapterIndex = bookmark?.chapterIndex ?: 0,
                                     currentPosition = bookmark?.positionMs ?: 0L,
                                     playbackSpeed = bookmark?.playbackSpeed ?: 1f,
-                                    duration = lastBook.chapters[bookmark?.chapterIndex ?: 0].durationMs
+                                    duration = lastBook.chapters[bookmark?.chapterIndex
+                                        ?: 0].durationMs
                                 )
                             }
 
@@ -201,8 +202,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // region Cover loading
-
-
     fun rescan() {
         viewModelScope.launch {
             settingsRepository.rootFolderUri.first()?.let { uriString ->
@@ -218,7 +217,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             coverArtRepository.saveCoverUri(audiobook.id, uri)
             resolvedCoverUris.remove(audiobook.id)
             val bitmap = withContext(Dispatchers.IO) {
-                decodeBitmapFromUri(uri, targetSize = 512)
+                coverArtExtractor.decodeBitmapFromUri(uri, targetSize = 512)
             }
             _playerState.update { it.copy(currentCoverBitmap = bitmap) }
         }
@@ -229,6 +228,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val allBookmarks = bookmarkRepository.getAllBookmarksList()
                 val allAudiobooks = libraryRepository.getAllAudiobookEntities()
+                val allNotes = noteRepository.getAllNotes()
 
                 val bookmarkBackup = allBookmarks.map { b ->
                     val title = allAudiobooks.find { it.id == b.audiobookId }?.title ?: ""
@@ -259,8 +259,15 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-
-                val backup = AppBackup(bookmarks = bookmarkBackup)
+                val notesBackup = allNotes.map { note ->
+                    NoteBackup(
+                        audiobookId = note.audiobookId,
+                        chapterIndex = note.chapterIndex,
+                        positionMS = note.positionMs,
+                        noteText = note.noteText
+                    )
+                }
+                val backup = AppBackup(bookmarks = bookmarkBackup, notes = notesBackup)
                 val json = Json.encodeToString(backup)
                 getApplication<Application>().contentResolver.openOutputStream(uri)?.use { stream ->
                     stream.write(json.toByteArray())
@@ -415,8 +422,11 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             val customUri = coverArtRepository.getCoverUri(audiobook.id)
             val bitmap = when {
-                customUri != null -> decodeBitmapFromUri(Uri.parse(customUri), targetSize = 512)
-                audiobook.coverUri != null -> decodeBitmapFromUri(
+                customUri != null -> coverArtExtractor.decodeBitmapFromUri(
+                    Uri.parse(customUri),
+                    targetSize = 512
+                )
+                audiobook.coverUri != null -> coverArtExtractor.decodeBitmapFromUri(
                     audiobook.coverUri.toUri(),
                     targetSize = 512
                 )
@@ -430,10 +440,10 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-    fun isFinished(audiobook: Audiobook, bookmark: BookmarkEntry? ) : Boolean{
-        return if (calculateProgress(audiobook,bookmark) >= 95f){
+    fun isFinished(audiobook: Audiobook, bookmark: BookmarkEntry?): Boolean {
+        return if (calculateProgress(audiobook, bookmark) >= 95f) {
             true
-        } else{
+        } else {
             false
         }
     }
@@ -495,7 +505,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     @OptIn(UnstableApi::class)
-    fun playAudiobookCustom(audiobook: Audiobook, chapterIndex : Int, positionMs: Long) {
+    fun playAudiobookCustom(audiobook: Audiobook, chapterIndex: Int, positionMs: Long) {
         viewModelScope.launch {
             isSwitchingBooks = true
             bookmarkSaveJob?.cancel()
@@ -647,7 +657,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         val audiobook = state.currentAudiobook ?: return
 
 
-        if (resetBooks.contains(audiobook.id)){
+        if (resetBooks.contains(audiobook.id)) {
             return
         }
         val position = controller.currentPosition.coerceAtLeast(0L)
@@ -703,9 +713,10 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
     private val resetBooks = mutableSetOf<String>()
 
-    fun resetProgress(audiobook: Audiobook){
+    fun resetProgress(audiobook: Audiobook) {
         viewModelScope.launch(Dispatchers.IO) {
             resetBooks.add(audiobook.id)
             Log.d("Reset", "Deleting bookmark for ${audiobook.title}")
@@ -713,7 +724,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             Log.d("Reset", "Bookmark deleted for ${audiobook.title}")
 
             // if this book is currently playing clear the state.
-            if(_playerState.value.currentAudiobook?.id == audiobook.id){
+            if (_playerState.value.currentAudiobook?.id == audiobook.id) {
                 _playerState.update {
                     it.copy(
                         currentAudiobook = null,
@@ -735,18 +746,19 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         _libraryState.update { it.copy(isGridView = !it.isGridView) }
     }
 
-    fun markAsFinished(audiobook: Audiobook){
+    fun markAsFinished(audiobook: Audiobook) {
         viewModelScope.launch(Dispatchers.IO) {
             val lastChapter = audiobook.chapters.last()
 
             bookmarkRepository.saveBookmark(
                 audiobookId = audiobook.id,
-                chapterIndex =  audiobook.chapters.size -1,
+                chapterIndex = audiobook.chapters.size - 1,
                 positionMs = lastChapter.durationMs,
                 playbackSpeed = 1f
             )
         }
     }
+
     private fun updateLibraryGroups() {
         viewModelScope.launch(Dispatchers.Default) {
             val audiobooks = _libraryState.value.audiobooks
@@ -777,46 +789,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun decodeBitmapFromUri(uri: Uri, targetSize: Int = 128): Bitmap? {
-        return try {
-            val contentResolver = getApplication<Application>().contentResolver
-
-            // get dimensions
-            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            contentResolver.openInputStream(uri)?.use { stream ->
-                BitmapFactory.decodeStream(stream, null, options)
-            }
-
-            // early exit if image is already small
-            if (options.outWidth <= targetSize && options.outHeight <= targetSize) {
-                options.inSampleSize = 1
-            } else {
-                options.inSampleSize = calculateSampleSize(
-                    options.outHeight,
-                    options.outHeight,
-                    targetSize
-                )
-            }
-
-            // load sampled image
-            options.inJustDecodeBounds = false
-            contentResolver.openInputStream(uri)?.use { stream ->
-                BitmapFactory.decodeStream(stream, null, options)
-            }
-        } catch (e: Exception) {
-            Log.e("Cover", "Failed to decode image: ${e.message}")
-            null
-        }
-    }
-
-    private fun calculateSampleSize(width: Int, height: Int, targetSize: Int): Int {
-        var sampleSize = 1
-        while (width / sampleSize > targetSize || height / sampleSize > targetSize) {
-            sampleSize *= 2
-        }
-        return sampleSize
-    }
-
 
     sealed class LibraryEvent {
         object ImportSuccess : LibraryEvent()
@@ -829,28 +801,33 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         audiobookId: String,
         chapterIndex: Int,
         positionMs: Long,
-        noteText : String,
-    ){
+        noteText: String,
+    ) {
         viewModelScope.launch {
             try {
 
                 noteRepository.addNote(audiobookId, chapterIndex, positionMs, noteText)
                 _snackbarMessage.value = "Note saved"
-            } catch (e: Exception){
+            } catch (e: Exception) {
                 _snackbarMessage.value = "Failed to save note"
             }
         }
     }
 
-     fun getNotesForAudiobook(audiobookId: String) : Flow<List<NoteEntity>> {
+    fun getNotesForAudiobook(audiobookId: String): Flow<List<NoteEntity>> {
         return noteRepository.getNotesForBook(audiobookId)
     }
 
     override fun onCleared() {
         super.onCleared()
         getApplication<Application>().unregisterReceiver(sleepTimerReceiver)
-        runBlocking { saveCurrentPosition() }
-        viewModelScope.launch { controllerManager.release() }
+        viewModelScope.launch {
+            withTimeout(2000) {
+                runCatching { saveCurrentPosition() }
+            }
+            controllerManager.release()
+        }
+
     }
 }
 
