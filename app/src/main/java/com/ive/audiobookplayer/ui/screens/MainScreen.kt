@@ -162,7 +162,7 @@ fun MainScreen(
             Spacer(Modifier.height(8.dp))
             Text(
                 text = playerState.currentBookTitle.ifEmpty { playerState.chapterTitle },
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -176,7 +176,7 @@ fun MainScreen(
                     text = playerState.chapterTitle.ifEmpty {
                         "Chapter ${playerState.currentChapterIndex + 1}"
                     },
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
@@ -189,7 +189,7 @@ fun MainScreen(
             Card(
                 modifier = Modifier
                     .size(coverSize)
-                    .shadow(12.dp, shape = RoundedCornerShape(20.dp)),
+                    .shadow(12.dp, shape = RoundedCornerShape(16.dp)),
                 shape = RoundedCornerShape(20.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
@@ -201,7 +201,7 @@ fun MainScreen(
                 )
             }
 
-            Spacer(Modifier.weight(2f))
+            Spacer(Modifier.weight(1f))
 
             SeekBarControl(
                 controller = controller,

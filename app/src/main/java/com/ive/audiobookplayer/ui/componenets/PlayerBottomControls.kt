@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -70,25 +69,12 @@ fun PlayerBottomControls(
             }
         }
 
-        HorizontalDivider(
-            thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onSpeedClick) {
-                Text(
-                    text = if (playbackSpeed == 1f) "1×" else "${playbackSpeed}×",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (playbackSpeed != 1f)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+
             TextButton(onClick = onSleepTimerClick) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -120,6 +106,16 @@ fun PlayerBottomControls(
                         )
                     }
                 }
+            }
+            TextButton(onClick = onSpeedClick) {
+                Text(
+                    text = if (playbackSpeed == 1f) "1×" else "${playbackSpeed}×",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (playbackSpeed != 1f)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             TextButton(onClick = { showNoteDialog = true }) {
                 Row(
