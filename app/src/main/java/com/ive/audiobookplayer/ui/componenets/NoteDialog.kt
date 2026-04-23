@@ -31,7 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.ive.audiobookplayer.utils.formatDuration
+import com.ive.audiobookplayer.utils.formatDurationSeconds
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteBottomSheet(
@@ -45,7 +46,7 @@ fun NoteBottomSheet(
     val focusRequester = remember { FocusRequester() }
     val characterLimit = 500
 
-    val formattedPosition = remember(positionMs) { formatDuration(positionMs) }
+    val formattedPosition = remember(positionMs) { formatDurationSeconds(positionMs) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

@@ -436,6 +436,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                     Uri.parse(customUri),
                     targetSize = 512
                 )
+
                 audiobook.coverUri != null -> coverArtExtractor.decodeBitmapFromUri(
                     audiobook.coverUri.toUri(),
                     targetSize = 512
@@ -457,7 +458,9 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             false
         }
     }
+
     private var isSwitchingBooks = false
+
     @OptIn(UnstableApi::class)
     fun playAudiobook(audiobook: Audiobook) {
         viewModelScope.launch {
@@ -826,6 +829,16 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getNotesForAudiobook(audiobookId: String): Flow<List<NoteEntity>> {
         return noteRepository.getNotesForBook(audiobookId)
+    }
+
+    fun deleteNote(note: NoteEntity) {
+        viewModelScope.launch {
+            noteRepository.deleteNote(note)
+        }
+    }
+
+    fun pause() {
+        _playerState.value.controller?.pause()
     }
 
     override fun onCleared() {

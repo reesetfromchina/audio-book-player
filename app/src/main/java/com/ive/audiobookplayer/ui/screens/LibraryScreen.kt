@@ -322,7 +322,8 @@ fun LibraryScreen(
                 },
 
                 onDeleteNote = { note ->
-//                    viewModel.deleteNote(note)
+//                    Log.d("Delete", "Deleting")
+                    viewModel.deleteNote(note)
                 },
 
                 )

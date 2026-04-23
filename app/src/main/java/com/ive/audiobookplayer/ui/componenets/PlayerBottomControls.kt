@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +37,7 @@ fun PlayerBottomControls(
     currentPositionMs: Long,
     currentChapterTitle: String,
     onSaveNote: (Int, Long, String) -> Unit,
+    onPause: () -> Unit,
 ) {
     var showNoteDialog by remember { mutableStateOf(false) }
 
@@ -139,6 +141,9 @@ fun PlayerBottomControls(
     }
 
     if (showNoteDialog) {
+        LaunchedEffect(Unit) {
+            onPause()
+        }
         NoteBottomSheet(
             positionMs = currentPositionMs,
             onDismiss = { showNoteDialog = false },

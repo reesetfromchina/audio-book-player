@@ -233,6 +233,9 @@ fun MainScreen(
                 currentChapterIndex = playerState.currentChapterIndex,
                 currentPositionMs = playerState.currentPosition,
                 currentChapterTitle = playerState.chapterTitle,
+                onPause = {
+                    viewModel.pause()
+                }
             )
 
             Spacer(Modifier.height(8.dp))
