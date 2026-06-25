@@ -1,11 +1,15 @@
 package com.ive.audiobookplayer.ui.componenets
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -18,6 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.media3.session.MediaController
@@ -37,32 +43,52 @@ fun SeekBarControl(
     val displayPosition = if (isSeeking) seekPosition else currentPosition.toFloat()
     val safeDuration = duration.coerceAtLeast(1L).toFloat()
     val adjustedDuration = (safeDuration / playbackSpeed).toLong()
+    val progress = (displayPosition / safeDuration).coerceIn(0f, 1f)
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Slider(
-            value = (displayPosition / safeDuration).coerceIn(0f, 1f),
-            valueRange = 0f..1f,
-            onValueChange = { fraction ->
-                isSeeking = true
-                seekPosition = fraction * safeDuration
-            },
-            onValueChangeFinished = {
-                controller.seekTo(seekPosition.toLong())
-                onPositionChange(seekPosition.toLong())
-                isSeeking = false
-            },
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-            ),
+    Column(modifier = Modifier.fillMaxWidth()) {
+
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(20.dp),
-        )
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.onSurface)
+                )
+            }
+
+            Slider(
+                value = progress,
+                onValueChange = { fraction ->
+                    isSeeking = true
+                    seekPosition = fraction * safeDuration
+                },
+                onValueChangeFinished = {
+                    controller.seekTo(seekPosition.toLong())
+                    onPositionChange(seekPosition.toLong())
+                    isSeeking = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.Transparent,
+                    activeTrackColor = Color.Transparent,
+                    inactiveTrackColor = Color.Transparent,
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent,
+                )
+            )
+        }
 
         Row(
             modifier = Modifier

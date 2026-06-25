@@ -49,9 +49,9 @@ class PlaybackService : MediaSessionService() {
 
 
 
-        player.addListener(object : Player.Listener{
+        player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                if(SleepTimerState.endOfChapterEnabled.get()){
+                if (SleepTimerState.endOfChapterEnabled.get()) {
                     player.pause()
                     SleepTimerState.endOfChapterEnabled.set(false)
                     sendBroadcast(Intent("audiobookplayer.SLEEP_TIMER_FIRED"))
@@ -123,6 +123,15 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            "ACTION_PLAY_PAUSE" -> {
+                val player = mediaSession?.player
+                if (player != null) {
+                    if (player.isPlaying) player.pause() else player.play()
+                }
+            }
+        }
+
         super.onStartCommand(intent, flags, startId)
         return START_STICKY
     }

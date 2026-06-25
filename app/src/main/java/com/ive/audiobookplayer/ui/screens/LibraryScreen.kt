@@ -2,6 +2,7 @@ package com.ive.audiobookplayer.ui.screens
 
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -24,6 +25,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderOpen
@@ -56,6 +60,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -74,9 +80,9 @@ import com.ive.audiobookplayer.ui.componenets.AudiobookGrid
 import com.ive.audiobookplayer.ui.componenets.DropdownMenuComponent
 import com.ive.audiobookplayer.ui.componenets.NotesBottomSheet
 import com.ive.audiobookplayer.utils.calculateProgress
+import com.ive.audiobookplayer.utils.toFormattedDuration
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 import com.ive.audiobookplayer.viewmodel.AudioViewModel.LibraryEvent
-import kotlin.collections.emptyList
 
 @Composable
 fun LibraryScreen(
@@ -147,7 +153,7 @@ fun LibraryScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Library", style = MaterialTheme.typography.headlineSmall)
+            Text("Audiobooks", style = MaterialTheme.typography.titleLarge)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -160,7 +166,7 @@ fun LibraryScreen(
                 }
                 IconButton(onClick = { viewModel.toggleLibraryView() }) {
                     Icon(
-                        imageVector = if (library.isGridView) Icons.Default.ViewList
+                        imageVector = if (library.isGridView) Icons.AutoMirrored.Filled.ViewList
                         else Icons.Default.GridView,
                         contentDescription = null
                     )
@@ -198,7 +204,7 @@ fun LibraryScreen(
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(2.dp))
 
         when {
             library.isInitializing -> Box(Modifier.fillMaxSize())
@@ -253,7 +259,7 @@ fun LibraryScreen(
             else -> {
                 LazyColumn(
                     state = listState,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     librarySection(
                         title = "In Progress",
@@ -387,7 +393,7 @@ fun LibrarySectionHeader(title: String, count: Int) {
         )
     }
     HorizontalDivider()
-    Spacer(Modifier.height(4.dp))
+//    Spacer(Modifier.height(4.dp))
 }
 
 
@@ -421,23 +427,25 @@ fun AudiobookCard(
                         expanded = true
                         haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     }),
+            shape = RectangleShape,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             colors = CardDefaults.cardColors(
                 containerColor = if (isFinished)
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
                 else
-                    MaterialTheme.colorScheme.surface
+                    Color.Transparent
             )
         ) {
 
             Row(
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier.padding(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .size(96.dp)
+                        .clip(RectangleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
@@ -455,7 +463,7 @@ fun AudiobookCard(
                         )
                     } else {
                         Icon(
-                            Icons.Default.MusicNote,
+                            Icons.Default.Book,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                         )
@@ -468,7 +476,7 @@ fun AudiobookCard(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.CheckCircle,
+                                Icons.Default.Check,
                                 contentDescription = "Finished",
                                 tint = Color.White,
                                 modifier = Modifier.size(28.dp)
@@ -488,24 +496,26 @@ fun AudiobookCard(
                             MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        "${audiobook.chapters.size} chapter(s)",
+                        "${if (audiobook.chapters.size == 1) "1 Chapter" else "${audiobook.chapters.size} Chapters"} ",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (bookmark != null) {
                         Spacer(Modifier.height(4.dp))
                         LinearProgressIndicator(
+
                             progress = { (progress / 100f).coerceIn(0f, 1f) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp)),
+
                             color = if (isFinished)
                                 MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                             else
                                 MaterialTheme.colorScheme.primary
+                            ,
+                            drawStopIndicator = {},
+                            gapSize = 0.dp,
+                            strokeCap = StrokeCap.Butt,
                         )
-                        Spacer(Modifier.height(2.dp))
+                        Spacer(Modifier.height(6.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -516,8 +526,8 @@ fun AudiobookCard(
 
                             Text(
                                 if (isFinished) "Finished"
-                                else if (hours > 0) "Ch.${bookmark.chapterIndex + 1} — %02d:%02d:%02d".format(hours, minutes, seconds)
-                                else "Ch.${bookmark.chapterIndex + 1} — %02d:%02d".format(minutes, seconds),
+                                else "Ch.${bookmark.chapterIndex + 1} — ${bookmark.positionMs.toFormattedDuration()}",
+
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

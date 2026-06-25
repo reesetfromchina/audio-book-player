@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,6 +68,9 @@ fun MainScreen(
 
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+
 
     if (controller == null || libraryState.isInitializing) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -136,8 +140,12 @@ fun MainScreen(
         }
     }
 
+    LaunchedEffect(playerState.isPlaying, playerState.currentPosition, playerState.currentBookTitle) {
+        viewModel.updateWidget(context)
+    }
+
     val configuration = LocalConfiguration.current
-    val coverSize = (configuration.screenHeightDp * 0.36f).dp.coerceIn(140.dp, 240.dp)
+    val coverSize = (configuration.screenHeightDp * 0.96f).dp.coerceIn(160.dp, 260.dp)
     val bookmark = libraryState.bookmarks[playerState.currentAudiobook?.id]
     val hasChapters = (playerState.currentAudiobook?.chapters?.size ?: 0) > 1
     val audiobook = playerState.currentAudiobook ?: return
@@ -158,10 +166,34 @@ fun MainScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBackToLibrary) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Text(
+                    text = playerState.currentBookTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
+                    textAlign = TextAlign.Center
+                )
+                IconButton(
+                    onClick = { viewModel.toggleChapterList() },
+                    enabled = hasChapters,
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Chapters")
+                }
+            }
             Spacer(Modifier.height(8.dp))
             Text(
-                text = playerState.currentBookTitle.ifEmpty { playerState.chapterTitle },
+                text = playerState.chapterTitle.ifEmpty { playerState.currentBookTitle },
                 style = MaterialTheme.typography.titleLarge,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
@@ -238,36 +270,7 @@ fun MainScreen(
                 }
             )
 
-            Spacer(Modifier.height(8.dp))
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBackToLibrary) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back to library",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                IconButton(
-                    onClick = { viewModel.toggleChapterList() },
-                    enabled = hasChapters,
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.List,
-                        contentDescription = "Chapters",
-                        tint = if (hasChapters)
-                            MaterialTheme.colorScheme.onSurface
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                    )
-                }
-            }
         }
     }
 }

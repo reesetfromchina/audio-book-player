@@ -1,7 +1,9 @@
 package com.ive.audiobookplayer.viewmodel
 
 import android.app.Application
+import android.appwidget.AppWidgetManager
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -11,6 +13,7 @@ import android.util.Base64
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
@@ -46,6 +49,7 @@ import com.ive.audiobookplayer.model.NoteBackup
 import com.ive.audiobookplayer.repository.LibraryRepository
 import com.ive.audiobookplayer.repository.NoteRepository
 import com.ive.audiobookplayer.repository.SettingsRepository
+import com.ive.audiobookplayer.service.PlayerWidget
 import com.ive.audiobookplayer.utils.calculateProgress
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -839,6 +843,45 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     fun pause() {
         _playerState.value.controller?.pause()
+    }
+
+    fun updateWidget(context: Context) {
+        val prefs = context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
+
+        val coverCachePath = saveCoverToCache(context, _playerState.value.currentAudiobook?.coverUri)
+
+        prefs.edit {
+            putString("title", _playerState.value.currentBookTitle)
+            putString("chapter", _playerState.value.chapterTitle)
+            putString("coverPath", coverCachePath)
+            putInt("progress", _playerState.value.currentAudiobook?.let { book-> calculateProgress(
+                book, libraryState.value.bookmarks[book.id]).toInt() } ?: 0 )
+            putBoolean("isPlaying", _playerState.value.isPlaying)
+        }
+
+        val manager = AppWidgetManager.getInstance(context)
+        val ids = manager.getAppWidgetIds(
+            ComponentName(context, PlayerWidget::class.java)
+        )
+        ids.forEach { PlayerWidget.updateWidget(context, manager, it) }
+    }
+
+    private fun saveCoverToCache(context: Context, coverUri: String?): String? {
+        coverUri ?: return null
+        return try {
+            val uri = Uri.parse(coverUri)
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+            val file = File(context.cacheDir, "widget_cover.jpg")
+            inputStream.use { input ->
+                file.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            file.absolutePath
+        } catch (e: Exception) {
+            Log.e("Widget", "Failed to cache cover", e)
+            null
+        }
     }
 
     override fun onCleared() {

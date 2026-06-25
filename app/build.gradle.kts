@@ -48,6 +48,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-text-google-fonts:1.6.0")
 
 
+    implementation("androidx.glance:glance-appwidget:1.1.0")
+    implementation("androidx.glance:glance-material3:1.1.0")
+
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.material3)
