@@ -1,18 +1,16 @@
 package com.ive.audiobookplayer.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -70,7 +67,6 @@ fun MainScreen(
     var showSpeedDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-
 
     if (controller == null || libraryState.isInitializing) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -145,93 +141,81 @@ fun MainScreen(
     }
 
     val configuration = LocalConfiguration.current
-    val coverSize = (configuration.screenHeightDp * 0.96f).dp.coerceIn(160.dp, 260.dp)
-    val bookmark = libraryState.bookmarks[playerState.currentAudiobook?.id]
-    val hasChapters = (playerState.currentAudiobook?.chapters?.size ?: 0) > 1
+    val coverSize = (configuration.screenWidthDp * 0.58f).dp.coerceIn(190.dp, 260.dp)
+
     val audiobook = playerState.currentAudiobook ?: return
+    val bookmark = libraryState.bookmarks[audiobook.id]
+    val hasChapters = audiobook.chapters.size > 1
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val snackbarMessage by viewModel.snackbarMessage.collectAsState()
-
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
-    ) { innerPadding ->
+        contentWindowInsets = WindowInsets(0),
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(WindowInsets.safeDrawing.asPaddingValues())
+                .padding(padding)
+                .statusBarsPadding()
                 .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBackToLibrary) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                 }
-                Text(
-                    text = playerState.currentBookTitle,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 8.dp),
-                    textAlign = TextAlign.Center
-                )
-                IconButton(
-                    onClick = { viewModel.toggleChapterList() },
-                    enabled = hasChapters,
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Chapters")
+                Spacer(Modifier.weight(1f))
+                if (hasChapters) {
+                    IconButton(onClick = { viewModel.toggleChapterList() }) {
+                        Icon(Icons.AutoMirrored.Filled.List, null)
+                    }
                 }
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = playerState.chapterTitle.ifEmpty { playerState.currentBookTitle },
-                style = MaterialTheme.typography.titleLarge,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-
-            if (hasChapters) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = playerState.chapterTitle.ifEmpty {
-                        "Chapter ${playerState.currentChapterIndex + 1}"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
 
             Spacer(Modifier.weight(1f))
 
             Card(
-                modifier = Modifier
-                    .size(coverSize)
-                    .shadow(12.dp, shape = RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(20.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                modifier = Modifier.size(coverSize),
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(2.dp)
             ) {
                 CoverArt(
                     coverBitmap = playerState.currentCoverBitmap,
                     size = coverSize,
                     enabled = true,
-                    onPickCover = onPickCover,
+                    onPickCover = onPickCover
                 )
             }
+
+            Spacer(Modifier.weight(1.2f))
+
+            Text(
+                text = playerState.currentBookTitle,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                text = playerState.chapterTitle.ifBlank { "Chapter ${playerState.currentChapterIndex + 1}" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
 
             Spacer(Modifier.weight(1f))
 
@@ -240,22 +224,24 @@ fun MainScreen(
                 currentPosition = playerState.currentPosition,
                 duration = playerState.duration,
                 playbackSpeed = playerState.playbackSpeed,
-                onPositionChange = { viewModel.updatePlayerState(currentPosition = it) },
+                onPositionChange = {
+                    viewModel.updatePlayerState(currentPosition = it)
+                }
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.weight(0.8f))
 
             PlayerControls(
                 controller = controller,
-                isPlaying = playerState.isPlaying,
+                isPlaying = playerState.isPlaying
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.weight(0.8f))
 
             PlayerBottomControls(
                 playbackSpeed = playerState.playbackSpeed,
                 sleepTimerLabel = playerState.sleepTimerLabel,
-                audiobook = playerState.currentAudiobook,
+                audiobook = audiobook,
                 bookmark = bookmark,
                 onSpeedClick = { showSpeedDialog = true },
                 onSleepTimerClick = { showSleepTimerDialog = true },
@@ -265,12 +251,10 @@ fun MainScreen(
                 currentChapterIndex = playerState.currentChapterIndex,
                 currentPositionMs = playerState.currentPosition,
                 currentChapterTitle = playerState.chapterTitle,
-                onPause = {
-                    viewModel.pause()
-                }
+                onPause = { viewModel.pause() }
             )
 
-
+            Spacer(Modifier.weight(0.6f))
         }
     }
 }

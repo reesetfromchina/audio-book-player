@@ -81,11 +81,11 @@ fun SeekBarControl(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
-                    thumbColor = Color.Transparent,
+                    thumbColor = MaterialTheme.colorScheme.primary,
                     activeTrackColor = Color.Transparent,
                     inactiveTrackColor = Color.Transparent,
-                    activeTickColor = Color.Transparent,
-                    inactiveTickColor = Color.Transparent,
+//                    activeTickColor = Color.Transparent,
+//                    inactiveTickColor = Color.Transparent,
                 )
             )
         }

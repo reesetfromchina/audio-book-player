@@ -1,5 +1,4 @@
 package com.ive.audiobookplayer.viewmodel
-
 import android.app.Application
 import android.appwidget.AppWidgetManager
 import android.content.BroadcastReceiver
@@ -84,7 +83,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private val _snackbarMessage = MutableStateFlow<String?>(null)
     val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
 
-    private var bookmarkSaveJob: Job? = null
     private var sleepTimerJob: Job? = null
     private val sleepTimerReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -469,7 +467,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     fun playAudiobook(audiobook: Audiobook) {
         viewModelScope.launch {
             isSwitchingBooks = true
-            bookmarkSaveJob?.cancel()
 
             resetBooks.remove(audiobook.id)
 
@@ -513,8 +510,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 loadCoverArt(audiobook)
-                delay(1000)
-                startPeriodicBookmarkSave()
             } finally {
                 isSwitchingBooks = false
             }
@@ -525,7 +520,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     fun playAudiobookCustom(audiobook: Audiobook, chapterIndex: Int, positionMs: Long) {
         viewModelScope.launch {
             isSwitchingBooks = true
-            bookmarkSaveJob?.cancel()
 
             resetBooks.remove(audiobook.id)
 
@@ -562,8 +556,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 loadCoverArt(audiobook)
-                delay(1000)
-                startPeriodicBookmarkSave()
             } finally {
                 isSwitchingBooks = false
             }
@@ -606,26 +598,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 playbackSpeed = playbackSpeed ?: current.playbackSpeed,
                 currentChapterIndex = currentChapterIndex ?: current.currentChapterIndex,
             )
-        }
-        if (isPlaying == false) {
-            bookmarkSaveJob?.cancel()
-            viewModelScope.launch {
-                if (isSwitchingBooks) {
-                    Log.d("Save", "skipping save — switching books")
-                    return@launch
-                }
-                saveCurrentPosition()
-            }
-        }
-
-        if (isPlaying == true) {
-            viewModelScope.launch {
-                delay(1000)
-                startPeriodicBookmarkSave()
-            }
-        }
-        if (playbackSpeed != null) {
-            viewModelScope.launch { saveCurrentPosition() }
         }
     }
 
@@ -689,16 +661,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             positionMs = position,
             playbackSpeed = state.playbackSpeed
         )
-    }
-
-    private fun startPeriodicBookmarkSave() {
-        bookmarkSaveJob?.cancel()
-        bookmarkSaveJob = viewModelScope.launch {
-            while (true) {
-                delay(10_000)
-                saveCurrentPosition()
-            }
-        }
     }
 
 
@@ -896,4 +858,3 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     }
 }
-

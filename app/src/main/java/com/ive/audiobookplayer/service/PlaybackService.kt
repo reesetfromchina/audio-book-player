@@ -18,17 +18,30 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.ive.audiobookplayer.MainActivity
 import com.ive.audiobookplayer.R
+import com.ive.audiobookplayer.repository.BookmarkRepository
 import com.ive.audiobookplayer.utils.SleepTimerState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 
 @UnstableApi
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
+    private lateinit var bookmarkRepository: BookmarkRepository
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var tickerJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        bookmarkRepository = BookmarkRepository(this)
 
         val player = ExoPlayer.Builder(this)
             .setAudioAttributes(
@@ -47,14 +60,28 @@ class PlaybackService : MediaSessionService() {
             }
         )
 
-
-
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (SleepTimerState.endOfChapterEnabled.get()) {
                     player.pause()
                     SleepTimerState.endOfChapterEnabled.set(false)
                     sendBroadcast(Intent("audiobookplayer.SLEEP_TIMER_FIRED"))
+                }
+                saveCurrentPosition(player)
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) {
+                    startTicker(player)
+                } else {
+                    tickerJob?.cancel()
+                    saveCurrentPosition(player)
+                }
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) {
+                    saveCurrentPosition(player)
                 }
             }
         })
@@ -63,6 +90,32 @@ class PlaybackService : MediaSessionService() {
             .setSessionActivity(buildPendingIntent())
             .setCallback(MediaSessionCallback())
             .build()
+    }
+
+    private fun startTicker(player: Player) {
+        tickerJob?.cancel()
+        tickerJob = serviceScope.launch {
+            while (isActive) {
+                delay(10_000)
+                saveCurrentPosition(player)
+            }
+        }
+    }
+
+    private fun saveCurrentPosition(player: Player) {
+        val item = player.currentMediaItem ?: return
+        val audiobookId = item.mediaMetadata.extras?.getString("audiobookId") ?: return
+        val chapterIndex = player.currentMediaItemIndex
+        val positionMs = player.currentPosition
+        val speed = player.playbackParameters.speed
+        serviceScope.launch(Dispatchers.IO) {
+            bookmarkRepository.saveBookmark(
+                audiobookId = audiobookId,
+                chapterIndex = chapterIndex,
+                positionMs = positionMs,
+                playbackSpeed = speed
+            )
+        }
     }
 
     private fun createNotificationChannel() {
@@ -89,7 +142,6 @@ class PlaybackService : MediaSessionService() {
         )
     }
 
-    // handles artwork loading for notification and lock screen
     private inner class MediaSessionCallback : MediaSession.Callback {
 
         @Deprecated("Deprecated in Java")
@@ -98,11 +150,7 @@ class PlaybackService : MediaSessionService() {
             controller: MediaSession.ControllerInfo
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
             return Futures.immediateFuture(
-                MediaSession.MediaItemsWithStartPosition(
-                    emptyList(),
-                    0,
-                    0L
-                )
+                MediaSession.MediaItemsWithStartPosition(emptyList(), 0, 0L)
             )
         }
 
@@ -131,19 +179,22 @@ class PlaybackService : MediaSessionService() {
                 }
             }
         }
-
         super.onStartCommand(intent, flags, startId)
         return START_STICKY
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = mediaSession?.player ?: return
+        saveCurrentPosition(player)
         if (!player.playWhenReady || player.mediaItemCount == 0) {
             stopSelf()
         }
     }
 
     override fun onDestroy() {
+        mediaSession?.player?.let { saveCurrentPosition(it) }
+        tickerJob?.cancel()
+        serviceScope.cancel()
         mediaSession?.run {
             player.release()
             release()

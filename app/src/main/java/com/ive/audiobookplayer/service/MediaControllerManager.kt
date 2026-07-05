@@ -3,6 +3,7 @@ package com.ive.audiobookplayer.service
 import android.app.Application
 import android.content.ComponentName
 import android.net.Uri
+import android.os.Bundle
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
@@ -63,6 +64,7 @@ class MediaControllerManager(private val application: Application) {
                 .setMediaMetadata(
                     MediaMetadata.Builder()
                         .setTitle(chapter.title)
+                        .setExtras(Bundle().apply { putString("audiobookId", audiobook.id) })
                         .setAlbumTitle(audiobook.title)
                         .setArtworkUri(coverUri)
                         .build()
@@ -132,6 +134,7 @@ class MediaControllerManager(private val application: Application) {
                 .setMediaMetadata(
                     MediaMetadata.Builder()
                         .setTitle(displayTitle)
+                        .setExtras(Bundle().apply { putString("audiobookId", audiobook.id) })
                         .setSubtitle(audiobook.title)
                         .setAlbumTitle(audiobook.title)
                         .setArtworkUri(coverUri)
