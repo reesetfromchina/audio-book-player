@@ -48,6 +48,7 @@ import com.ive.audiobookplayer.model.NoteBackup
 import com.ive.audiobookplayer.repository.LibraryRepository
 import com.ive.audiobookplayer.repository.NoteRepository
 import com.ive.audiobookplayer.repository.SettingsRepository
+import com.ive.audiobookplayer.service.BackupManager
 import com.ive.audiobookplayer.service.PlayerWidget
 import com.ive.audiobookplayer.utils.calculateProgress
 import kotlinx.coroutines.flow.Flow
@@ -67,6 +68,14 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private val libraryRepository = LibraryRepository(application)
     private val coverArtRepository = CoverArtRepository(application)
     private val noteRepository = NoteRepository(application)
+
+    private val backupManager = BackupManager(
+        bookmarkRepository,
+        libraryRepository,
+        noteRepository,
+        coverArtRepository,
+        application.contentResolver
+    )
 
     private val audiobookScanner = AudiobookScanner(application)
     private val coverArtExtractor = CoverArtExtractor(application)
@@ -227,120 +236,8 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun exportBackup(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val allBookmarks = bookmarkRepository.getAllBookmarksList()
-                val allAudiobooks = libraryRepository.getAllAudiobookEntities()
-                val allNotes = noteRepository.getAllNotes()
 
-                val bookmarkBackup = allBookmarks.map { b ->
-                    val title = allAudiobooks.find { it.id == b.audiobookId }?.title ?: ""
 
-                    // resolve custom cover
-                    val coverBase64 = try {
-                        val customUri = coverArtRepository.getCoverUri(b.audiobookId)
-                        if (customUri != null) {
-                            getApplication<Application>().contentResolver
-                                .openInputStream(customUri.toUri())?.use { stream ->
-                                    Base64.encodeToString(
-                                        stream.readBytes(),
-                                        Base64.DEFAULT
-                                    )
-                                }
-                        } else null
-                    } catch (e: Exception) {
-                        null
-                    }
-                    BookmarkBackup(
-                        bookTitle = title,
-                        audiobookId = b.audiobookId,
-                        chapterIndex = b.chapterIndex,
-                        positionMS = b.positionMs,
-                        playbackSpeed = b.playbackSpeed,
-                        lastPlayedAt = b.lastPlayedAt,
-                        customCoverBase64 = coverBase64,
-                    )
-                }
-
-                val notesBackup = allNotes.map { note ->
-                    NoteBackup(
-                        audiobookId = note.audiobookId,
-                        chapterIndex = note.chapterIndex,
-                        positionMS = note.positionMs,
-                        noteText = note.noteText
-                    )
-                }
-                val backup = AppBackup(bookmarks = bookmarkBackup, notes = notesBackup)
-                val json = Json.encodeToString(backup)
-                getApplication<Application>().contentResolver.openOutputStream(uri)?.use { stream ->
-                    stream.write(json.toByteArray())
-                }
-
-                _events.emit(LibraryEvent.ExportSuccess)
-            } catch (e: Exception) {
-                _events.emit(LibraryEvent.ExportError(e.message ?: "Error"))
-
-            }
-        }
-    }
-
-    @kotlin.OptIn(ExperimentalCoilApi::class)
-    fun importBackup(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val json = getApplication<Application>().contentResolver
-                    .openInputStream(uri)?.use { it.bufferedReader().readText() } ?: return@launch
-                val backup = Json.decodeFromString<AppBackup>(json)
-                val currentAudiobooks = libraryRepository.getAllAudiobookEntities()
-                // restore bookmarks and notes
-                bookmarkRepository.importBackup(backup, currentAudiobooks)
-
-                // restore custom covers separately using coverArtRepository
-                backup.bookmarks.forEach { bookmarkBackup ->
-                    bookmarkBackup.customCoverBase64?.let { base64 ->
-                        try {
-                            val matchedId = currentAudiobooks
-                                .find { it.id == bookmarkBackup.audiobookId || it.title == bookmarkBackup.bookTitle }
-                                ?.id ?: bookmarkBackup.audiobookId
-
-                            val bytes = Base64.decode(base64, Base64.DEFAULT)
-                            val coverFile = File(
-                                getApplication<Application>().filesDir,
-                                "custom_covers/${matchedId}.jpg"
-                            )
-                            coverFile.parentFile?.mkdirs()
-                            coverFile.writeBytes(bytes)
-
-                            // use existing saveCoverUri
-                            coverArtRepository.saveCoverUri(matchedId, coverFile.toUri())
-                        } catch (e: Exception) {
-                            Log.e(
-                                "Import",
-                                "Failed to restore cover for ${bookmarkBackup.bookTitle}",
-                                e
-                            )
-                        }
-                    }
-                }
-
-                resolvedCoverUris.clear()
-                val currentBooks = _libraryState.value.audiobooks
-                preloadCoverUris(currentBooks)
-
-                withContext(Dispatchers.Main) {
-                    Coil.imageLoader(getApplication()).memoryCache?.clear()
-                    Coil.imageLoader(getApplication()).diskCache?.clear()
-                }
-
-                _events.emit(LibraryEvent.ImportSuccess)
-                Log.d("Backup", "Import successful — ${backup.bookmarks.size} bookmarks restored")
-            } catch (e: Exception) {
-                Log.e("Backup", "Import failed", e)
-                _events.emit(LibraryEvent.ImportError(e.message ?: "Error"))
-            }
-        }
-    }
 
 
     // region Library
@@ -843,6 +740,40 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) {
             Log.e("Widget", "Failed to cache cover", e)
             null
+        }
+    }
+
+    fun exportBackup(uri: Uri){
+        viewModelScope.launch(Dispatchers.IO){
+            try {
+                backupManager.exportBackup(uri)
+                _events.emit(LibraryEvent.ExportSuccess)
+            } catch (e: Exception){
+                _events.emit(LibraryEvent.ExportError(e.message ?: "Error"))
+            }
+        }
+    }
+
+    @kotlin.OptIn(ExperimentalCoilApi::class)
+    fun importBackup(uri: Uri){
+        viewModelScope.launch(Dispatchers.IO){
+            try {
+                backupManager.importBackup(uri, getApplication<Application>().filesDir)
+
+                resolvedCoverUris.clear()
+                val currentBooks = _libraryState.value.audiobooks
+                preloadCoverUris(currentBooks)
+
+                withContext(Dispatchers.Main){
+                    Coil.imageLoader(getApplication()).memoryCache?.clear();
+                    Coil.imageLoader(getApplication()).diskCache?.clear();
+                }
+
+                _events.emit(LibraryEvent.ImportSuccess)
+            } catch (e: Exception){
+                Log.e("Backup", "Import failed", e)
+                _events.emit(LibraryEvent.ImportError(e.message ?: "Error"))
+            }
         }
     }
 
