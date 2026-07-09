@@ -80,4 +80,20 @@ interface NoteDao{
 
     @Query("SELECT * FROM notes")
     suspend fun getAllNotesList() : List<NoteEntity>
+
+    @Query(
+        """
+            SELECT COUNT(*) FROM notes
+            WHERE audiobookId = :audiobookId
+            AND chapterIndex = :chapterIndex
+            AND positionMs = :positionMs
+            AND noteText = :noteText
+        """
+    )
+    suspend fun countMatching(
+        audiobookId: String,
+        chapterIndex: Int,
+        positionMs: Long,
+        noteText: String,
+    ) : Int
 }

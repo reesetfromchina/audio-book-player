@@ -23,20 +23,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -51,7 +47,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,7 +63,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.datastore.preferences.protobuf.LazyStringArrayList.emptyList
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -78,7 +72,6 @@ import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryState
 import com.ive.audiobookplayer.ui.componenets.AudiobookGrid
 import com.ive.audiobookplayer.ui.componenets.DropdownMenuComponent
-import com.ive.audiobookplayer.ui.componenets.NotesBottomSheet
 import com.ive.audiobookplayer.utils.calculateProgress
 import com.ive.audiobookplayer.utils.toFormattedDuration
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
@@ -126,20 +119,6 @@ fun LibraryScreen(
                 }
             }
         }
-    }
-
-    LaunchedEffect(selectedNoteToPlay) {
-        val note = selectedNoteToPlay ?: return@LaunchedEffect
-
-        viewModel.playAudiobookCustom(
-            selectedAudiobookForNotes!!,
-            note.chapterIndex,
-            note.positionMs
-        )
-
-        navController.navigate("player")
-
-        selectedNoteToPlay = null
     }
 
     Column(
@@ -270,8 +249,10 @@ fun LibraryScreen(
                         onResetProgress = { viewModel.resetProgress(it) },
                         onFinishedAudiobook = { viewModel.markAsFinished(it) },
                         onViewNote = { audiobook ->
-                            selectedAudiobookForNotes = audiobook
-                            showNotesSheet = true
+//                            selectedAudiobookForNotes = audiobook
+//                            showNotesSheet = true
+
+                            navController.navigate("notes/${audiobook.id}")
                         }
 
 
@@ -310,30 +291,6 @@ fun LibraryScreen(
 
         }
 
-        if (showNotesSheet && selectedAudiobookForNotes != null) {
-            val notes by viewModel.getNotesForAudiobook(selectedAudiobookForNotes!!.id)
-                .collectAsState(initial = emptyList())
-
-            NotesBottomSheet(
-                audiobook = selectedAudiobookForNotes!!,
-                notes = notes as List<NoteEntity>,
-//                Log.d("Notes", notes.forEach { note -> note?.toString() })
-                onDismiss = {
-                    showNotesSheet = false
-                    selectedAudiobookForNotes = null
-                },
-                onNoteClicked = { note ->
-                    selectedNoteToPlay = note
-                    showNotesSheet = false
-                },
-
-                onDeleteNote = { note ->
-//                    Log.d("Delete", "Deleting")
-                    viewModel.deleteNote(note)
-                },
-
-                )
-        }
     }
 }
 

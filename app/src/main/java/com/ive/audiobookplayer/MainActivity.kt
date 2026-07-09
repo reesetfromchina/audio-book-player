@@ -15,11 +15,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.ive.audiobookplayer.ui.screens.LibraryScreen
 import com.ive.audiobookplayer.ui.screens.MainScreen
+import com.ive.audiobookplayer.ui.screens.NotesScreen
 import com.ive.audiobookplayer.ui.theme.AudioBookTheme
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 
@@ -110,6 +113,19 @@ class MainActivity : ComponentActivity() {
                                 onBackToLibrary = { navController.popBackStack() },
                                 onPickCover = { imagePicker.launch(arrayOf("image/*")) },
                             )}
+
+                        composable(
+                            route = "notes/{audiobookId}",
+                            arguments = listOf(navArgument("audiobookId") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            val audiobookId = backStackEntry.arguments?.getString("audiobookId") ?: return@composable
+                            NotesScreen(
+                                audiobookId = audiobookId,
+                                viewModel = viewModel, // however you're passing your AudioViewModel down today
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
                     }
                 }
             }

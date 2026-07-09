@@ -94,25 +94,27 @@ class BookmarkRepository(context: Context) {
         }
 
         backup.notes.forEach { noteBackup ->
-            val matchedId = when {
-                currentAudiobooks.any { it.id == noteBackup.audiobookId } ->
-                    noteBackup.audiobookId
+            val matchedId = currentAudiobooks.find { it.id == noteBackup.audiobookId }?.id
+                ?: noteBackup.audiobookId
 
-                else ->
-                    currentAudiobooks.find { it.title == noteBackup.audiobookId }?.id
-            } ?: return@forEach
+            val alreadyExists = noteDao.countMatching(
+                audiobookId = matchedId,
+                chapterIndex = noteBackup.chapterIndex,
+                positionMs = noteBackup.positionMS,
+                noteText = noteBackup.noteText,
+            ) > 0
 
-            noteDao.insertNote(
-                NoteEntity(
-                    audiobookId = matchedId,
-                    chapterIndex = noteBackup.chapterIndex,
-                    positionMs = noteBackup.positionMS,
-                    noteText = noteBackup.noteText,
+            if (!alreadyExists) {
+                noteDao.insertNote(
+                    NoteEntity(
+                        audiobookId = matchedId,
+                        chapterIndex = noteBackup.chapterIndex,
+                        positionMs = noteBackup.positionMS,
+                        noteText = noteBackup.noteText,
+                    )
                 )
-            )
+            }
         }
-
-
     }
 
     suspend fun deleteBookmark(audiobookId: String) = bookmarkDao.deleteBookmark(audiobookId)
