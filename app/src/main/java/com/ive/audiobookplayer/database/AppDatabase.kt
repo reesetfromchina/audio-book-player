@@ -4,8 +4,9 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
+import com.ive.audiobookplayer.database.daos.AudiobookDao
+import com.ive.audiobookplayer.database.daos.BookmarkDao
+import com.ive.audiobookplayer.database.daos.NoteDao
 
 @Database(
     entities = [

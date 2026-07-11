@@ -349,7 +349,6 @@ fun LibrarySectionHeader(title: String, count: Int) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
-    HorizontalDivider()
 //    Spacer(Modifier.height(4.dp))
 }
 
@@ -385,7 +384,6 @@ fun AudiobookCard(
                         haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                     }),
             shape = RectangleShape,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             colors = CardDefaults.cardColors(
                 containerColor = if (isFinished)
                     MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
@@ -402,7 +400,6 @@ fun AudiobookCard(
                 Box(
                     modifier = Modifier
                         .size(96.dp)
-                        .clip(RectangleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {

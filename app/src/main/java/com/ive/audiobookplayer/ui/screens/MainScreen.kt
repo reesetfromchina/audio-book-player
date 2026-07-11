@@ -1,5 +1,7 @@
 package com.ive.audiobookplayer.ui.screens
 
+import androidx.compose.foundation.MarqueeAnimationMode
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +10,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -40,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
@@ -141,7 +146,11 @@ fun MainScreen(
     }
 
     val configuration = LocalConfiguration.current
-    val coverSize = (configuration.screenWidthDp * 0.58f).dp.coerceIn(190.dp, 260.dp)
+    val screenHeight = configuration.screenHeightDp.dp
+    val screenWidth = configuration.screenWidthDp.dp
+
+    val coverSize = (configuration.screenWidthDp * 0.75f).dp.coerceIn(190.dp, 340.dp)
+    val horizontalPadding = (screenWidth * 0.06f).coerceIn(16.dp, 32.dp)
 
     val audiobook = playerState.currentAudiobook ?: return
     val bookmark = libraryState.bookmarks[audiobook.id]
@@ -160,7 +169,8 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .statusBarsPadding()
-                .padding(horizontal = 24.dp),
+                .navigationBarsPadding()
+                .padding(horizontal = horizontalPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
@@ -180,8 +190,8 @@ fun MainScreen(
                 }
             }
 
-            Spacer(Modifier.weight(1f))
 
+            Spacer(Modifier.weight(0.4f))
             Card(
                 modifier = Modifier.size(coverSize),
                 shape = RoundedCornerShape(24.dp),
@@ -195,15 +205,22 @@ fun MainScreen(
                 )
             }
 
-            Spacer(Modifier.weight(1.2f))
 
+            Spacer(Modifier.weight(0.5f))
             Text(
                 text = playerState.currentBookTitle,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .basicMarquee(
+                        iterations = Int.MAX_VALUE,
+                        animationMode = MarqueeAnimationMode.Immediately,
+                        repeatDelayMillis = 1000,
+                    )
             )
 
             Spacer(Modifier.height(6.dp))
@@ -217,7 +234,7 @@ fun MainScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.weight(0.5f))
 
             SeekBarControl(
                 controller = controller,
@@ -229,14 +246,12 @@ fun MainScreen(
                 }
             )
 
-            Spacer(Modifier.weight(0.8f))
-
             PlayerControls(
                 controller = controller,
                 isPlaying = playerState.isPlaying
             )
 
-            Spacer(Modifier.weight(0.8f))
+            Spacer(Modifier.weight(0.8f).heightIn(min = 16.dp))
 
             PlayerBottomControls(
                 playbackSpeed = playerState.playbackSpeed,
@@ -254,7 +269,6 @@ fun MainScreen(
                 onPause = { viewModel.pause() }
             )
 
-            Spacer(Modifier.weight(0.6f))
         }
     }
 }

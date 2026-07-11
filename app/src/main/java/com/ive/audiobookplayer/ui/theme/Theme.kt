@@ -8,26 +8,38 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+val LightColors = lightColorScheme(
+    primary = Color(0xFFB5651D),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFFFDCC2),
+    onPrimaryContainer = Color(0xFF3B1B00),
+
+    secondary = Color(0xFF8D6E63),
+    onSecondary = Color(0xFFFFFFFF),
+
+    background = Color(0xFFFFF8F2),
+    onBackground = Color(0xFF2A1D14),
+
+    surface = Color(0xFFFFF1E6),
+    onSurface = Color(0xFF2A1D14),
+    onSurfaceVariant = Color(0xFF5C4A3D),
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+val DarkColors = darkColorScheme(
+    primary = Color(0xFFFFB77C),
+    onPrimary = Color(0xFF4A2800),
+    primaryContainer = Color(0xFF6B3E00),
+    onPrimaryContainer = Color(0xFFFFDCC2),
 
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    secondary = Color(0xFFD7B8A9),
+    onSecondary = Color(0xFF3E2A1F),
+
+    background = Color(0xFF1C1512),
+    onBackground = Color(0xFFEDE0D5),
+
+    surface = Color(0xFF241B16),
+    onSurface = Color(0xFFEDE0D5),
+    onSurfaceVariant = Color(0xFFCBB6A5),
 )
 
 private val DarkScheme = darkColorScheme(
@@ -76,11 +88,11 @@ fun AudioBookTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = if (darkTheme) DarkColors else LightColors
+
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
         content = content
     )
 }

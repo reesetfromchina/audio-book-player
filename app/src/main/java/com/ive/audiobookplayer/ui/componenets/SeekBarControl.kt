@@ -103,26 +103,31 @@ fun SeekBarControl(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            if (playbackSpeed != 1f) {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = TimeFormatter.formatTime(adjustedDuration),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+            Box(
+                modifier = Modifier.height(32.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                if (playbackSpeed != 1f) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = TimeFormatter.formatTime(adjustedDuration),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = TimeFormatter.formatTime(safeDuration.toLong()),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            textDecoration = TextDecoration.LineThrough,
+                        )
+                    }
+                } else {
                     Text(
                         text = TimeFormatter.formatTime(safeDuration.toLong()),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        textDecoration = TextDecoration.LineThrough,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            } else {
-                Text(
-                    text = TimeFormatter.formatTime(safeDuration.toLong()),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }

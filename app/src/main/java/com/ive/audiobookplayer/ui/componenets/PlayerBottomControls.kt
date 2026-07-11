@@ -50,30 +50,30 @@ fun PlayerBottomControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (audiobook != null) {
-            val remainingMs = calculateTimeRemaining(audiobook, bookmark, playbackSpeed)
-            if (remainingMs > 0) {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = "${formatDuration(remainingMs)} remaining",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (playbackSpeed != 1f) {
-                        val naturalMs = calculateTimeRemaining(audiobook, bookmark, 1f)
-                        Text(
-                            text = "  ·  ${formatDuration(naturalMs)} at 1×",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        )
-                    }
-                }
-            }
-        }
+//        if (audiobook != null) {
+//            val remainingMs = calculateTimeRemaining(audiobook, bookmark, playbackSpeed)
+//            if (remainingMs > 0) {
+//                Row(
+//                    horizontalArrangement = Arrangement.Center,
+//                    verticalAlignment = Alignment.CenterVertically,
+//                    modifier = Modifier.fillMaxWidth(),
+//                ) {
+//                    Text(
+//                        text = "${formatDuration(remainingMs)} remaining",
+//                        style = MaterialTheme.typography.labelSmall,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+//                    )
+//                    if (playbackSpeed != 1f) {
+//                        val naturalMs = calculateTimeRemaining(audiobook, bookmark, 1f)
+//                        Text(
+//                            text = "  ·  ${formatDuration(naturalMs)} at 1×",
+//                            style = MaterialTheme.typography.labelSmall,
+//                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+//                        )
+//                    }
+//                }
+//            }
+//        }
 
         Row(
             modifier = Modifier
