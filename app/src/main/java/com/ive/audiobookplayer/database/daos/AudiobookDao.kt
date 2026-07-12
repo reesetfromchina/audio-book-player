@@ -5,9 +5,9 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
-import com.ive.audiobookplayer.database.AudiobookEntity
-import com.ive.audiobookplayer.database.AudiobookWithChapters
-import com.ive.audiobookplayer.database.ChapterEntity
+import com.ive.audiobookplayer.database.entity.AudiobookEntity
+import com.ive.audiobookplayer.database.relation.AudiobookWithChapters
+import com.ive.audiobookplayer.database.entity.ChapterEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

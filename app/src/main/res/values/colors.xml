@@ -12,4 +12,5 @@
     <color name="widget_text_secondary">#99FFFFFF</color>
     <color name="widget_accent">#FF4F7EF7</color>
     <color name="widget_btn">#2AFFFFFF</color>
+    <color name="color_background">#FF1C1512</color>
 </resources>

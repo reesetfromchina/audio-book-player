@@ -2,9 +2,9 @@ package com.ive.audiobookplayer.repository
 
 import android.content.Context
 import com.ive.audiobookplayer.database.AppDatabase
-import com.ive.audiobookplayer.database.AudiobookEntity
-import com.ive.audiobookplayer.database.AudiobookWithChapters
-import com.ive.audiobookplayer.database.ChapterEntity
+import com.ive.audiobookplayer.database.entity.AudiobookEntity
+import com.ive.audiobookplayer.database.relation.AudiobookWithChapters
+import com.ive.audiobookplayer.database.entity.ChapterEntity
 import com.ive.audiobookplayer.model.Audiobook
 import kotlinx.coroutines.flow.Flow
 

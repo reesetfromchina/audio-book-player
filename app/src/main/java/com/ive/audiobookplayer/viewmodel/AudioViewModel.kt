@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
-import android.util.Base64
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
@@ -35,29 +34,26 @@ import com.ive.audiobookplayer.utils.CoverArtExtractor
 import androidx.core.net.toUri
 import coil.Coil
 import coil.annotation.ExperimentalCoilApi
-import com.ive.audiobookplayer.database.NoteEntity
+import com.ive.audiobookplayer.database.entity.NoteEntity
+import com.ive.audiobookplayer.database.mapper.toAudiobook
+import com.ive.audiobookplayer.database.mapper.toBookmarkEntry
 import com.ive.audiobookplayer.utils.SleepTimerState
-import com.ive.audiobookplayer.database.toAudiobook
-import com.ive.audiobookplayer.database.toBookmarkEntry
-import com.ive.audiobookplayer.model.AppBackup
-import com.ive.audiobookplayer.model.BookmarkBackup
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryGroups
 import com.ive.audiobookplayer.model.LibraryState
-import com.ive.audiobookplayer.model.NoteBackup
 import com.ive.audiobookplayer.repository.LibraryRepository
 import com.ive.audiobookplayer.repository.NoteRepository
 import com.ive.audiobookplayer.repository.SettingsRepository
 import com.ive.audiobookplayer.service.BackupManager
 import com.ive.audiobookplayer.service.PlayerWidget
 import com.ive.audiobookplayer.utils.calculateProgress
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.io.File
 
 class AudioViewModel(application: Application) : AndroidViewModel(application) {
@@ -103,6 +99,9 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val _startupComplete = MutableStateFlow(false)
+    val startupComplete = _startupComplete.asStateFlow()
+
     init {
 
         // register receiver
@@ -139,61 +138,11 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 val audiobooks = audiobooksWithChapters.map { it.toAudiobook() }
 
                 preloadCoverUris(audiobooks)
-                _libraryState.update {
-                    it.copy(
-                        audiobooks = audiobooks, isInitializing = false
-                    )
-                }
+                _libraryState.update { it.copy(audiobooks = audiobooks, isInitializing = false) }
+
                 updateLibraryGroups()
 
-
-                if (_playerState.value.currentAudiobook == null) {
-                    settingsRepository.getLastBookId()?.let { lastId ->
-                        val lastBook = audiobooks.find { it.id == lastId }
-                        if (lastBook != null) {
-                            val bookmark = withContext(Dispatchers.IO) {
-                                bookmarkRepository.getBookmark(lastId)
-                            }
-
-                            val customCoverUri = withContext(Dispatchers.IO) {
-                                coverArtRepository.getCoverUri(lastId)
-                            }
-
-                            val coverUri = when {
-                                customCoverUri != null -> Uri.parse(customCoverUri)
-                                lastBook.coverUri != null -> lastBook.coverUri.toUri()
-                                else -> null
-                            }
-
-                            _playerState.update {
-                                it.copy(
-                                    currentAudiobook = lastBook,
-                                    currentBookTitle = lastBook.title,
-                                    currentChapterIndex = bookmark?.chapterIndex ?: 0,
-                                    currentPosition = bookmark?.positionMs ?: 0L,
-                                    playbackSpeed = bookmark?.playbackSpeed ?: 1f,
-                                    duration = lastBook.chapters[bookmark?.chapterIndex
-                                        ?: 0].durationMs
-                                )
-                            }
-
-                            viewModelScope.launch {
-                                controllerManager.controller.first { it != null }
-                                controllerManager.prepareAudiobook(
-                                    audiobook = lastBook,
-                                    startChapterIndex = bookmark?.chapterIndex ?: 0,
-                                    startPositionMs = bookmark?.positionMs ?: 0L,
-                                    coverUri = coverUri
-                                )
-                                _playerState.value.controller?.setPlaybackSpeed(
-                                    bookmark?.playbackSpeed ?: 1f
-                                )
-                            }
-
-                            loadCoverArt(lastBook)
-                        }
-                    }
-                }
+                restoreLastSession(audiobooks)
             }
         }
 
@@ -217,7 +166,8 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     // region Cover loading
     fun rescan() {
         viewModelScope.launch {
-            settingsRepository.rootFolderUri.first()?.let { uriString ->
+            val uriString = settingsRepository.rootFolderUri.first()
+            if(uriString!= null){
                 backgroundRescan(uriString.toUri())
             }
         }
@@ -309,16 +259,20 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun preloadCoverUris(audiobooks: List<Audiobook>) {
         withContext(Dispatchers.IO) {
-            audiobooks.forEach { audiobook ->
-                if (!resolvedCoverUris.containsKey(audiobook.id)) {
-                    val customUri = coverArtRepository.getCoverUri(audiobook.id)
-                    resolvedCoverUris[audiobook.id] = when {
-                        customUri != null -> Uri.parse(customUri)
-                        audiobook.coverUri != null -> audiobook.coverUri.toUri()
-                        else -> null
+            audiobooks.filter { !resolvedCoverUris.containsKey(it.id) }
+                .map { audiobook ->
+                    async {
+                        val customUri = coverArtRepository.getCoverUri(audiobook.id)
+                        val uri = when {
+                            customUri != null -> Uri.parse(customUri)
+                            audiobook.coverUri != null -> audiobook.coverUri.toUri()
+                            else -> null
+                        }
+                        audiobook.id to uri
                     }
                 }
-            }
+                .awaitAll()
+                .forEach { (id, uri) -> resolvedCoverUris[id] = uri }
         }
     }
 
@@ -775,6 +729,65 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                 _events.emit(LibraryEvent.ImportError(e.message ?: "Error"))
             }
         }
+    }
+    private var restoreAttempted = false
+    private suspend fun restoreLastSession(audiobooks: List<Audiobook>) {
+        if (restoreAttempted) return
+        restoreAttempted = true
+
+
+        val lastBookId = settingsRepository.getLastBookId()
+
+        if (lastBookId == null) {
+            _startupComplete.value = true
+            return
+        }
+
+        val audiobook = audiobooks.find { it.id == lastBookId }
+        if (audiobook == null) {
+            settingsRepository.clearLastBookId()
+            _startupComplete.value = true
+            return
+        }
+
+        val bookmark = bookmarkRepository.getBookmark(lastBookId)
+
+        val chapterIndex = (bookmark?.chapterIndex ?: 0).coerceIn(0, audiobook.chapters.lastIndex)
+
+        _playerState.update {
+            it.copy(
+                currentAudiobook = audiobook,
+                currentBookTitle = audiobook.title,
+                currentChapterIndex = chapterIndex,
+                currentPosition = bookmark?.positionMs ?: 0L,
+                playbackSpeed = bookmark?.playbackSpeed ?: 1f,
+                duration = audiobook.chapters[chapterIndex].durationMs
+            )
+        }
+
+        controllerManager.controller.first { it != null }
+
+        controllerManager.prepareAudiobook(
+            audiobook = audiobook,
+            startChapterIndex = chapterIndex,
+            startPositionMs = bookmark?.positionMs ?: 0L,
+            coverUri = resolveCoverUriAnother(audiobook)
+        )
+
+        loadCoverArt(audiobook)
+
+        _startupComplete.value = true
+    }
+    private suspend fun resolveCoverUriAnother(
+        audiobook: Audiobook
+    ) : Uri?{
+        val customCoverUri = coverArtRepository.getCoverUri(audiobook.id)
+        val coverUri = when {
+            customCoverUri != null -> Uri.parse(customCoverUri)
+            audiobook.coverUri != null -> audiobook.coverUri.toUri()
+            else -> null
+        }
+        return coverUri
     }
 
     override fun onCleared() {

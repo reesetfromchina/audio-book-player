@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.database
+package com.ive.audiobookplayer.database.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

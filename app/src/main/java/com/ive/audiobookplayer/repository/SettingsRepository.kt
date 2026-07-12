@@ -33,4 +33,10 @@ class SettingsRepository(private val context: Context) {
             prefs[LAST_BOOK_ID_KEY] = id
         }
     }
+
+    suspend fun clearLastBookId() {
+        context.settingsDataStore.edit { prefs ->
+            prefs[LAST_BOOK_ID_KEY] = ""
+        }
+    }
 }

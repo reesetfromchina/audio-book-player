@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ive.audiobookplayer.utils.formatDurationSeconds
-
+// todo this might need improving
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteBottomSheet(

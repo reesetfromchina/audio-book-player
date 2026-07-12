@@ -1,8 +1,11 @@
-package com.ive.audiobookplayer.database
+package com.ive.audiobookplayer.database.mapper
 
+import com.ive.audiobookplayer.database.entity.BookmarkEntity
+import com.ive.audiobookplayer.database.relation.AudiobookWithChapters
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.Chapter
+
 
 fun AudiobookWithChapters.toAudiobook(): Audiobook {
     return Audiobook(

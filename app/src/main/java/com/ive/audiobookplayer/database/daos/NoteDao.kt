@@ -4,7 +4,7 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
-import com.ive.audiobookplayer.database.NoteEntity
+import com.ive.audiobookplayer.database.entity.NoteEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

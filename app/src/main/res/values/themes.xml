@@ -2,4 +2,10 @@
 <resources>
 
     <style name="Theme.AudioBookPlayer" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.App.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/color_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/johnny_automatic_look_it_up</item>
+        <item name="postSplashScreenTheme">@style/Theme.AudioBookPlayer</item>
+    </style>
+
 </resources>

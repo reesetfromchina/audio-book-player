@@ -66,7 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.ive.audiobookplayer.database.NoteEntity
+import com.ive.audiobookplayer.database.entity.NoteEntity
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryState
@@ -97,7 +97,6 @@ fun LibraryScreen(
         { audiobook: Audiobook -> viewModel.resolveCoverUri(audiobook) }
     }
 
-    var selectedNoteToPlay by remember { mutableStateOf<NoteEntity?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -229,8 +228,7 @@ fun LibraryScreen(
                     onResetProgress = { viewModel.resetProgress(it) },
                     onFinishedAudiobook = { viewModel.markAsFinished(it) },
                     onViewNotes = { audiobook ->
-                        selectedAudiobookForNotes = audiobook
-                        showNotesSheet = true
+                        navController.navigate("notes/${audiobook.id}")
                     }
                 )
             }
@@ -249,9 +247,6 @@ fun LibraryScreen(
                         onResetProgress = { viewModel.resetProgress(it) },
                         onFinishedAudiobook = { viewModel.markAsFinished(it) },
                         onViewNote = { audiobook ->
-//                            selectedAudiobookForNotes = audiobook
-//                            showNotesSheet = true
-
                             navController.navigate("notes/${audiobook.id}")
                         }
 
@@ -266,8 +261,7 @@ fun LibraryScreen(
                         onResetProgress = { viewModel.resetProgress(it) },
                         onFinishedAudiobook = { viewModel.markAsFinished(it) },
                         onViewNote = { audiobook ->
-                            selectedAudiobookForNotes = audiobook
-                            showNotesSheet = true
+                            navController.navigate("notes/${audiobook.id}")
                         }
 
 
@@ -282,8 +276,7 @@ fun LibraryScreen(
                         onResetProgress = { viewModel.resetProgress(it) },
                         onFinishedAudiobook = { viewModel.markAsFinished(it) },
                         onViewNote = { audiobook ->
-                            selectedAudiobookForNotes = audiobook
-                            showNotesSheet = true
+                            navController.navigate("notes/${audiobook.id}")
                         }
                     )
                 }

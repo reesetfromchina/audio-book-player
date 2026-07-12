@@ -2,9 +2,9 @@ package com.ive.audiobookplayer.repository
 
 import android.content.Context
 import com.ive.audiobookplayer.database.AppDatabase
-import com.ive.audiobookplayer.database.AudiobookEntity
-import com.ive.audiobookplayer.database.BookmarkEntity
-import com.ive.audiobookplayer.database.NoteEntity
+import com.ive.audiobookplayer.database.entity.AudiobookEntity
+import com.ive.audiobookplayer.database.entity.BookmarkEntity
+import com.ive.audiobookplayer.database.entity.NoteEntity
 import com.ive.audiobookplayer.model.AppBackup
 import com.ive.audiobookplayer.model.BookmarkEntry
 import kotlinx.coroutines.flow.Flow

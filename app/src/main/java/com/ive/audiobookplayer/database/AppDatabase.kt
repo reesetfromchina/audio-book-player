@@ -7,6 +7,10 @@ import androidx.room.RoomDatabase
 import com.ive.audiobookplayer.database.daos.AudiobookDao
 import com.ive.audiobookplayer.database.daos.BookmarkDao
 import com.ive.audiobookplayer.database.daos.NoteDao
+import com.ive.audiobookplayer.database.entity.AudiobookEntity
+import com.ive.audiobookplayer.database.entity.BookmarkEntity
+import com.ive.audiobookplayer.database.entity.ChapterEntity
+import com.ive.audiobookplayer.database.entity.NoteEntity
 
 @Database(
     entities = [

@@ -14,7 +14,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -67,32 +69,62 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         navigateToPlayer.value = true
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        splashScreen.setKeepOnScreenCondition {
+            !viewModel.startupComplete.value
+        }
+        splashScreen.setOnExitAnimationListener { splashScreenView ->
+            splashScreenView.iconView
+                .animate()
+                .setDuration(300)
+                .scaleX(1.1f)
+                .scaleY(1.1f)
+                .alpha(0f)
+                .withEndAction { splashScreenView.remove() }
+                .start()
+        }
+
         enableEdgeToEdge()
         setContent {
+
+            val playerState by viewModel.playerState.collectAsState()
+
+
             AudioBookTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
                 ) {
 
+                    val startupComplete by viewModel.startupComplete.collectAsState()
+
+
+                    if(!startupComplete){
+                        return@Surface
+                    }
+
                     val playerState by viewModel.playerState.collectAsState()
                     val libraryState by viewModel.libraryState.collectAsState()
                     val navController = rememberNavController()
-                    if (navigateToPlayer.value) {
-                        LaunchedEffect(Unit) {
-                            navController.navigate("player") {
-                                launchSingleTop = true
-                            }
-                            navigateToPlayer.value = false
-                        }
-                        navigateToPlayer.value = false
+
+                    val startDestination = remember {
+                        if(playerState.currentAudiobook != null) "player" else "library"
                     }
 
-                    NavHost(navController = navController, startDestination = "library") {
+                    LaunchedEffect(navigateToPlayer.value) {
+                        if(navigateToPlayer.value){
+                            navController.navigate("player") { launchSingleTop = true}
+                            navigateToPlayer.value = false
+                        }
+                    }
+
+                    NavHost(navController = navController, startDestination = startDestination) {
                         composable("library") {
                             LibraryScreen(
                                 viewModel = viewModel,
@@ -110,7 +142,11 @@ class MainActivity : ComponentActivity() {
                         composable("player") {
                             MainScreen(
                                 viewModel = viewModel,
-                                onBackToLibrary = { navController.popBackStack() },
+                                onBackToLibrary = {
+                                    if (!navController.popBackStack()){
+                                        navController.navigate("library")
+                                    }
+                                },
                                 onPickCover = { imagePicker.launch(arrayOf("image/*")) },
                             )}
 
@@ -121,7 +157,7 @@ class MainActivity : ComponentActivity() {
                             val audiobookId = backStackEntry.arguments?.getString("audiobookId") ?: return@composable
                             NotesScreen(
                                 audiobookId = audiobookId,
-                                viewModel = viewModel, // however you're passing your AudioViewModel down today
+                                viewModel = viewModel,
                                 navController = navController,
                                 onBack = { navController.popBackStack() },
                             )

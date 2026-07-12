@@ -189,10 +189,10 @@ class AudiobookScanner(private val context: Context) {
             coverUri = coverUri
         )
     }
-    fun scanFolderFast(rootUri: Uri): List<Pair<String, String>> {
+    suspend fun scanFolderFast(rootUri: Uri): List<Pair<String, String>> = coroutineScope {
         val rootDocId = DocumentsContract.getTreeDocumentId(rootUri)
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, rootDocId)
-        val folders = mutableListOf<Pair<String, String>>()
+        val candidateFolders = mutableListOf<Pair<String, String>>()
 
         context.contentResolver.query(
             childrenUri,
@@ -208,11 +208,41 @@ class AudiobookScanner(private val context: Context) {
                 val name = cursor.getString(1) ?: continue
                 val mime = cursor.getString(2) ?: continue
                 if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
-                    folders.add(docId to name)
+                    candidateFolders.add(docId to name)
                 }
             }
         }
-        return folders
+        candidateFolders
+            .map { (docId, name) ->
+                async(Dispatchers.IO) { if (folderLikelyHasAudio(rootUri, docId)) docId to name else null }
+            }
+            .awaitAll()
+            .filterNotNull()
+    }
+
+    /**
+     * Shallow check: does this folder contain an audio file directly,
+     * or a subfolder (in case chapters are nested one level deep)?
+     * Not a full recursive scan — just enough to filter out non-audiobook folders fast.
+     */
+    private fun folderLikelyHasAudio(rootUri: Uri, docId: String): Boolean {
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, docId)
+        context.contentResolver.query(
+            childrenUri,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE
+            ),
+            null, null, null
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(0) ?: continue
+                val mime = cursor.getString(1) ?: continue
+                if (mime == DocumentsContract.Document.MIME_TYPE_DIR) return true
+                if (isAudioFile(name)) return true
+            }
+        }
+        return false
     }
     // full scan — reads everything including durations
     suspend fun scanFolder(rootUri: Uri): List<Audiobook> = coroutineScope {

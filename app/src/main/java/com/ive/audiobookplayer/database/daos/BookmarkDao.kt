@@ -3,7 +3,7 @@ package com.ive.audiobookplayer.database.daos
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
-import com.ive.audiobookplayer.database.BookmarkEntity
+import com.ive.audiobookplayer.database.entity.BookmarkEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

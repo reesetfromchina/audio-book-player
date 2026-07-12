@@ -1,5 +1,6 @@
 package com.ive.audiobookplayer.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.MarqueeAnimationMode
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
@@ -195,7 +196,7 @@ fun MainScreen(
             Card(
                 modifier = Modifier.size(coverSize),
                 shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(2.dp)
+                elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 CoverArt(
                     coverBitmap = playerState.currentCoverBitmap,
@@ -256,8 +257,6 @@ fun MainScreen(
             PlayerBottomControls(
                 playbackSpeed = playerState.playbackSpeed,
                 sleepTimerLabel = playerState.sleepTimerLabel,
-                audiobook = audiobook,
-                bookmark = bookmark,
                 onSpeedClick = { showSpeedDialog = true },
                 onSleepTimerClick = { showSleepTimerDialog = true },
                 onSaveNote = { chapter, pos, text ->

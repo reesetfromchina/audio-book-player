@@ -2,7 +2,7 @@ package com.ive.audiobookplayer.repository
 
 import android.content.Context
 import com.ive.audiobookplayer.database.AppDatabase
-import com.ive.audiobookplayer.database.NoteEntity
+import com.ive.audiobookplayer.database.entity.NoteEntity
 import kotlinx.coroutines.flow.Flow
 
 class NoteRepository(context: Context) {
