@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.componenets
+package com.ive.audiobookplayer.ui.components
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image

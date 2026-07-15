@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.screens
+package com.ive.audiobookplayer.ui
 
 import androidx.compose.foundation.MarqueeAnimationMode
 import androidx.compose.foundation.basicMarquee
@@ -53,12 +53,13 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.navigation.NavController
-import com.ive.audiobookplayer.ui.componenets.CoverArt
-import com.ive.audiobookplayer.ui.componenets.PlayerBottomControls
-import com.ive.audiobookplayer.ui.componenets.PlayerControls
-import com.ive.audiobookplayer.ui.componenets.SeekBarControl
-import com.ive.audiobookplayer.ui.componenets.SleepTimerDialog
-import com.ive.audiobookplayer.ui.componenets.SpeedPickerDialog
+import com.ive.audiobookplayer.ui.components.ChapterListSheet
+import com.ive.audiobookplayer.ui.components.CoverArt
+import com.ive.audiobookplayer.ui.player.PlayerBottomControls
+import com.ive.audiobookplayer.ui.player.PlayerControls
+import com.ive.audiobookplayer.ui.player.SeekBarControl
+import com.ive.audiobookplayer.ui.player.SleepTimerDialog
+import com.ive.audiobookplayer.ui.player.SpeedPickerDialog
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 import com.ive.audiobookplayer.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay

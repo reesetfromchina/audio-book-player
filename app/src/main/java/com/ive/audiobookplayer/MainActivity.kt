@@ -24,10 +24,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.ive.audiobookplayer.repository.ThemeMode
-import com.ive.audiobookplayer.ui.componenets.settings.SettingsScreen
-import com.ive.audiobookplayer.ui.screens.LibraryScreen
-import com.ive.audiobookplayer.ui.screens.MainScreen
-import com.ive.audiobookplayer.ui.screens.NotesScreen
+import com.ive.audiobookplayer.ui.settings.SettingsScreen
+import com.ive.audiobookplayer.ui.library.LibraryScreen
+import com.ive.audiobookplayer.ui.MainScreen
+import com.ive.audiobookplayer.ui.notes.NotesScreen
 import com.ive.audiobookplayer.ui.theme.AudioBookTheme
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
 import com.ive.audiobookplayer.viewmodel.SettingsViewModel

@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.componenets
+package com.ive.audiobookplayer.ui.notes
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

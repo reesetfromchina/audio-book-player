@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.componenets
+package com.ive.audiobookplayer.ui.library
 
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -41,6 +41,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
+import com.ive.audiobookplayer.ui.components.DropdownMenuComponent
 import com.ive.audiobookplayer.utils.TimeFormatter
 import com.ive.audiobookplayer.utils.calculateProgress
 

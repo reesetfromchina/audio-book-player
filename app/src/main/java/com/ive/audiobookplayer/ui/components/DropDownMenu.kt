@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.componenets
+package com.ive.audiobookplayer.ui.components
 
 import android.net.Uri
 import androidx.compose.material3.DropdownMenu
@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
+import com.ive.audiobookplayer.ui.library.AudiobookInfoSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

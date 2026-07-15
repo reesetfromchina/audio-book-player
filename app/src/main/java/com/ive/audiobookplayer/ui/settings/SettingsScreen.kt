@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.componenets.settings
+package com.ive.audiobookplayer.ui.settings
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -24,7 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ive.audiobookplayer.repository.ThemeMode
-import com.ive.audiobookplayer.ui.componenets.SpeedPickerDialog
+import com.ive.audiobookplayer.ui.player.SpeedPickerDialog
 import com.ive.audiobookplayer.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

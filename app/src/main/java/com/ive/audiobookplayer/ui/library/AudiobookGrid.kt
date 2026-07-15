@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.componenets
+package com.ive.audiobookplayer.ui.library
 
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
@@ -40,9 +40,9 @@ fun AudiobookGrid(
                 bookmark = bookmarks[book.id],
                 coverUri = resolveCover(book),
                 onClick = { onAudiobookSelected(book) },
-                onResetProgress = {onResetProgress(book)},
-                onFinishedAudiobook = {onFinishedAudiobook(book)},
-                onViewNotes = {onViewNotes(book)}
+                onResetProgress = { onResetProgress(book) },
+                onFinishedAudiobook = { onFinishedAudiobook(book) },
+                onViewNotes = { onViewNotes(book) }
             )
         }
     }

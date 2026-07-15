@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.componenets.settings
+package com.ive.audiobookplayer.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row

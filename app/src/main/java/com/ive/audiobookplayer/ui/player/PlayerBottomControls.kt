@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.componenets
+package com.ive.audiobookplayer.ui.player
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.ive.audiobookplayer.ui.screens.NoteFullScreenDialog
+import com.ive.audiobookplayer.ui.notes.NoteFullScreenDialog
 @Composable
 fun PlayerBottomControls(
     playbackSpeed: Float,

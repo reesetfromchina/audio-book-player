@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.screens
+package com.ive.audiobookplayer.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,7 +31,6 @@ import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.utils.TimeFormatter
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.LinearProgressIndicator

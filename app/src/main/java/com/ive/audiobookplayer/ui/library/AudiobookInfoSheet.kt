@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.componenets
+package com.ive.audiobookplayer.ui.library
 
 import android.net.Uri
 import androidx.compose.foundation.background

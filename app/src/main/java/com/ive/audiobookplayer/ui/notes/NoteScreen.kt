@@ -1,4 +1,4 @@
-package com.ive.audiobookplayer.ui.screens
+package com.ive.audiobookplayer.ui.notes
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
