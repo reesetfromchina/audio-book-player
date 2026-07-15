@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -78,92 +79,113 @@ fun NotesScreen(
         }
     ) { padding ->
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(16.dp)
-        ) {
-            if(groupedNotes.isEmpty()){
-                item{
+        when {
+            notes == null -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            groupedNotes.isNullOrEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(text = "You have no notes for this audiobook broski")
                 }
             }
-            groupedNotes.forEach { (chapterIndex, chapterNotes) ->
 
-                item {
-                    Text(
-                        text = "Chapter ${chapterIndex + 1}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    groupedNotes.forEach { (chapterIndex, chapterNotes) ->
 
-                    HorizontalDivider(
-                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
-                    )
-                }
+                        item {
+                            Text(
+                                text = "Chapter ${chapterIndex + 1}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
 
-                items(chapterNotes, key = { it.id }) { note ->
-
-                    val dismissState = rememberSwipeToDismissBoxState()
-
-                    SwipeToDismissBox(
-                        state = dismissState,
-                        enableDismissFromStartToEnd = false,
-                        onDismiss = { dismissValue ->
-                            if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
-                                viewModel.deleteNote(note)
-                            }
-                        },
-                        backgroundContent = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.errorContainer)
-                                    .padding(end = 16.dp),
-                                contentAlignment = Alignment.CenterEnd
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete Note",
-                                    tint = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
+                            HorizontalDivider(
+                                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                            )
                         }
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable {
-                                    if (playerState.currentAudiobook?.id == audiobookId){
-                                        viewModel.seekTo(note.chapterIndex, note.positionMs)
-                                    } else{
-                                        viewModel.playAudiobookCustom(audiobook, note.chapterIndex, note.positionMs)
+
+                        items(chapterNotes, key = { it.id }) { note ->
+                            val dismissStatie = rememberSwipeToDismissBoxState()
+
+                            SwipeToDismissBox(
+                                state = dismissStatie,
+                                enableDismissFromStartToEnd = false,
+                                onDismiss = { dismissValue ->
+                                    if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                                        viewModel.deleteNote(note)
                                     }
-                                    navController.navigate("player"){
-                                        popUpTo("player") {inclusive = true}
+                                },
+                                backgroundContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.errorContainer)
+                                            .padding(end = 16.dp),
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete Note",
+                                            tint = MaterialTheme.colorScheme.onErrorContainer
+                                        )
                                     }
                                 }
-                                .padding(vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = note.noteText,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .clickable {
+                                            if (playerState.currentAudiobook?.id == audiobookId) {
+                                                viewModel.seekTo(note.chapterIndex, note.positionMs)
+                                            } else {
+                                                viewModel.playAudiobookCustom(audiobook, note.chapterIndex, note.positionMs)
+                                            }
 
-                            Spacer(Modifier.height(4.dp))
+                                            navController.navigate("player"){
+                                                popUpTo("player") { inclusive = true}
+                                            }
+                                        }.padding(vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        text = note.noteText,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
 
-                            Text(
-                                text = formatTime(note.positionMs),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                                    Spacer(Modifier.height(4.dp))
+
+                                    Text(
+                                        text = formatTime(note.positionMs),
+                                        style =  MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+
     }
 }

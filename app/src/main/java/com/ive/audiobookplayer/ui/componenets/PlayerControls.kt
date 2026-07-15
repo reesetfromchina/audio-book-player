@@ -3,44 +3,41 @@ package com.ive.audiobookplayer.ui.componenets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.SegmentedButtonDefaults.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.session.MediaController
-import com.ive.audiobookplayer.R
 
 @Composable
 fun PlayerControls(
     controller: MediaController,
-    isPlaying: Boolean
+    isPlaying: Boolean,
+    skipBackSeconds: Int,
+    skipForwardSeconds: Int,
+    onPlayPauseClick: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        IconButton(onClick = { controller.seekTo(controller.currentPosition - 15_000) }) {
+        IconButton(onClick = { controller.seekTo(controller.currentPosition - skipBackSeconds * 1000L) }) {
             Icon(
                 (Icons.Default.FastRewind),
-                contentDescription = "Back 15 seconds",
+                contentDescription = "Back ${skipBackSeconds*1000L} seconds",
                 modifier = Modifier.size(32.dp)
             )
         }
@@ -54,7 +51,7 @@ fun PlayerControls(
         }
 
         FilledIconButton(
-            onClick = { if (isPlaying) controller.pause() else controller.play() },
+            onClick = onPlayPauseClick,
             modifier = Modifier.size(72.dp),
         ) {
             Icon(
@@ -72,10 +69,10 @@ fun PlayerControls(
             )
         }
 
-        IconButton(onClick = { controller.seekTo(controller.currentPosition + 30_000) }) {
+        IconButton(onClick = { controller.seekTo(controller.currentPosition + skipForwardSeconds*1000L) }) {
             Icon(
                 (Icons.Default.FastForward),
-                contentDescription = "Forward 30 seconds",
+                contentDescription = "Forward ${skipForwardSeconds*1000L} seconds",
                 modifier = Modifier.size(32.dp)
             )
         }

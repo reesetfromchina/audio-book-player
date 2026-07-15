@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -22,11 +23,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.ive.audiobookplayer.repository.ThemeMode
+import com.ive.audiobookplayer.ui.componenets.settings.SettingsScreen
 import com.ive.audiobookplayer.ui.screens.LibraryScreen
 import com.ive.audiobookplayer.ui.screens.MainScreen
 import com.ive.audiobookplayer.ui.screens.NotesScreen
 import com.ive.audiobookplayer.ui.theme.AudioBookTheme
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
+import com.ive.audiobookplayer.viewmodel.SettingsViewModel
 
 
 class MainActivity : ComponentActivity() {
@@ -45,6 +49,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     private val viewModel: AudioViewModel by viewModels()
+    private val settingsViewModel: SettingsViewModel by viewModels()
     private val folderPickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
@@ -81,14 +86,18 @@ class MainActivity : ComponentActivity() {
             !viewModel.startupComplete.value
         }
         splashScreen.setOnExitAnimationListener { splashScreenView ->
-            splashScreenView.iconView
-                .animate()
-                .setDuration(300)
-                .scaleX(1.1f)
-                .scaleY(1.1f)
-                .alpha(0f)
-                .withEndAction { splashScreenView.remove() }
-                .start()
+            try {
+                splashScreenView.iconView
+                    .animate()
+                    .setDuration(300)
+                    .scaleX(1.1f)
+                    .scaleY(1.1f)
+                    .alpha(0f)
+                    .withEndAction { splashScreenView.remove() }
+                    .start()
+            } catch (e: Exception) {
+                splashScreenView.remove()
+            }
         }
 
         enableEdgeToEdge()
@@ -96,8 +105,14 @@ class MainActivity : ComponentActivity() {
 
             val playerState by viewModel.playerState.collectAsState()
 
+            val themeMode by settingsViewModel.settingsState.collectAsState()
+            val darkTheme = when (themeMode.themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
 
-            AudioBookTheme {
+            AudioBookTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
                 ) {
@@ -142,13 +157,22 @@ class MainActivity : ComponentActivity() {
                         composable("player") {
                             MainScreen(
                                 viewModel = viewModel,
+                                settingsViewModel = settingsViewModel,
                                 onBackToLibrary = {
                                     if (!navController.popBackStack()){
                                         navController.navigate("library")
                                     }
                                 },
                                 onPickCover = { imagePicker.launch(arrayOf("image/*")) },
+                                navController = navController,
                             )}
+
+                        composable("settings"){
+                            SettingsScreen(
+                                settingsViewModel = settingsViewModel,
+                                onBack = {navController.popBackStack()}
+                            )
+                        }
 
                         composable(
                             route = "notes/{audiobookId}",

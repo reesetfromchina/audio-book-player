@@ -44,7 +44,7 @@ android {
 
 dependencies {
 
-
+    implementation("androidx.lifecycle:lifecycle-runtime-compose")
     implementation("androidx.compose.ui:ui-text-google-fonts:1.6.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
 

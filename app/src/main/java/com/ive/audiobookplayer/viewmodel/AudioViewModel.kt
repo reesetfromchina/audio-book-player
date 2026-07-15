@@ -41,6 +41,7 @@ import com.ive.audiobookplayer.utils.SleepTimerState
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.model.LibraryGroups
 import com.ive.audiobookplayer.model.LibraryState
+import com.ive.audiobookplayer.model.SnackbarEvent
 import com.ive.audiobookplayer.repository.LibraryRepository
 import com.ive.audiobookplayer.repository.NoteRepository
 import com.ive.audiobookplayer.repository.SettingsRepository
@@ -85,8 +86,8 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
     private val _events = MutableSharedFlow<LibraryEvent>()
     val events = _events.asSharedFlow()
 
-    private val _snackbarMessage = MutableStateFlow<String?>(null)
-    val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
+    private val _snackbarEvent = MutableStateFlow<SnackbarEvent?>(null)
+    val snackbarEvent: StateFlow<SnackbarEvent?> = _snackbarEvent.asStateFlow()
 
     private var sleepTimerJob: Job? = null
     private val sleepTimerReceiver = object : BroadcastReceiver() {
@@ -185,10 +186,6 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             _playerState.update { it.copy(currentCoverBitmap = bitmap) }
         }
     }
-
-
-
-
 
     // region Library
 
@@ -637,11 +634,20 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             try {
 
                 noteRepository.addNote(audiobookId, chapterIndex, positionMs, noteText)
-                _snackbarMessage.value = "Note saved"
+                _snackbarEvent.value = SnackbarEvent(
+                    message = "Note saved",
+                    hasViewNotesAction = true
+                )
             } catch (e: Exception) {
-                _snackbarMessage.value = "Failed to save note"
+                _snackbarEvent.value = SnackbarEvent(
+                    message = "Failed to save note",
+                )
             }
         }
+    }
+
+    fun onSnackbarShown(){
+        _snackbarEvent.value = null
     }
 
     fun getNotesForAudiobook(audiobookId: String): Flow<List<NoteEntity>> {
@@ -788,6 +794,35 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             else -> null
         }
         return coverUri
+    }
+
+    private var pausedAt: Long? = null
+
+    fun onPlayPauseClicked() {
+        val controller = controllerManager.controller.value ?: return
+
+        if (controller.isPlaying) {
+            pausedAt = System.currentTimeMillis()
+            controller.pause()
+            return
+        }
+
+        viewModelScope.launch {
+            val rewindSeconds = settingsRepository.autoRewindSeconds.first()
+
+            val pauseDuration = pausedAt?.let {
+                System.currentTimeMillis() - it
+            } ?: 0L
+
+            if (pauseDuration >= 30_000L && rewindSeconds > 0) {
+                controller.seekTo(
+                    maxOf(0L, controller.currentPosition - rewindSeconds * 1000L)
+                )
+            }
+
+            controller.play()
+            pausedAt = null
+        }
     }
 
     override fun onCleared() {

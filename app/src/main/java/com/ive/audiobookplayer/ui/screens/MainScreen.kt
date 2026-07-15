@@ -1,6 +1,5 @@
 package com.ive.audiobookplayer.ui.screens
 
-import android.util.Log
 import androidx.compose.foundation.MarqueeAnimationMode
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
@@ -27,8 +26,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -47,9 +48,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.navigation.NavController
 import com.ive.audiobookplayer.ui.componenets.CoverArt
 import com.ive.audiobookplayer.ui.componenets.PlayerBottomControls
 import com.ive.audiobookplayer.ui.componenets.PlayerControls
@@ -57,11 +60,14 @@ import com.ive.audiobookplayer.ui.componenets.SeekBarControl
 import com.ive.audiobookplayer.ui.componenets.SleepTimerDialog
 import com.ive.audiobookplayer.ui.componenets.SpeedPickerDialog
 import com.ive.audiobookplayer.viewmodel.AudioViewModel
+import com.ive.audiobookplayer.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
 
 @Composable
 fun MainScreen(
     viewModel: AudioViewModel,
+    settingsViewModel: SettingsViewModel,
+    navController: NavController,
     onBackToLibrary: () -> Unit,
     onPickCover: () -> Unit,
 ) {
@@ -73,6 +79,23 @@ fun MainScreen(
     var showSpeedDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val screenWidth = configuration.screenWidthDp.dp
+
+    val coverSize = (configuration.screenWidthDp * 0.75f).dp.coerceIn(190.dp, 380.dp)
+    val horizontalPadding = (screenWidth * 0.06f).coerceIn(16.dp, 32.dp)
+
+    val audiobook = playerState.currentAudiobook ?: return
+    val bookmark = libraryState.bookmarks[audiobook.id]
+    val hasChapters = audiobook.chapters.size > 1
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarEvent by viewModel.snackbarEvent.collectAsStateWithLifecycle()
+    val audiobookId = playerState.currentAudiobook?.id
+
+    val settings by settingsViewModel.settingsState.collectAsState()
 
     if (controller == null || libraryState.isInitializing) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -146,18 +169,20 @@ fun MainScreen(
         viewModel.updateWidget(context)
     }
 
-    val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
-    val screenWidth = configuration.screenWidthDp.dp
+    LaunchedEffect(snackbarEvent) {
+        snackbarEvent?.let { event->
 
-    val coverSize = (configuration.screenWidthDp * 0.75f).dp.coerceIn(190.dp, 340.dp)
-    val horizontalPadding = (screenWidth * 0.06f).coerceIn(16.dp, 32.dp)
-
-    val audiobook = playerState.currentAudiobook ?: return
-    val bookmark = libraryState.bookmarks[audiobook.id]
-    val hasChapters = audiobook.chapters.size > 1
-
-    val snackbarHostState = remember { SnackbarHostState() }
+            val result = snackbarHostState.showSnackbar(
+                message = event.message,
+                actionLabel = if (event.hasViewNotesAction) "View notes" else null,
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed){
+                navController.navigate("notes/${audiobookId}")
+            }
+            viewModel.onSnackbarShown()
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -249,7 +274,10 @@ fun MainScreen(
 
             PlayerControls(
                 controller = controller,
-                isPlaying = playerState.isPlaying
+                isPlaying = playerState.isPlaying,
+                skipBackSeconds = settings.skipBackwardSeconds,
+                skipForwardSeconds = settings.skipForwardSeconds,
+                onPlayPauseClick = viewModel::onPlayPauseClicked
             )
 
             Spacer(Modifier.weight(0.8f).heightIn(min = 16.dp))

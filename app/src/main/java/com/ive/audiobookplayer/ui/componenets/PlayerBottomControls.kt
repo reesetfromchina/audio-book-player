@@ -25,10 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.ive.audiobookplayer.model.Audiobook
-import com.ive.audiobookplayer.model.BookmarkEntry
-import com.ive.audiobookplayer.utils.calculateTimeRemaining
-import com.ive.audiobookplayer.utils.formatDuration
+import com.ive.audiobookplayer.ui.screens.NoteFullScreenDialog
 @Composable
 fun PlayerBottomControls(
     playbackSpeed: Float,
@@ -132,7 +129,7 @@ fun PlayerBottomControls(
         LaunchedEffect(Unit) {
             onPause()
         }
-        NoteBottomSheet(
+        NoteFullScreenDialog(
             positionMs = currentPositionMs,
             onDismiss = { showNoteDialog = false },
             onSave = { noteText ->
