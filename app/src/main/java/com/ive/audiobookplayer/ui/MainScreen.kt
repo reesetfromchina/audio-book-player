@@ -218,7 +218,7 @@ fun MainScreen(
             }
 
 
-            Spacer(Modifier.weight(0.4f))
+            Spacer(Modifier.weight(0.7f))
             Card(
                 modifier = Modifier.size(coverSize),
                 shape = RoundedCornerShape(24.dp),
@@ -261,7 +261,7 @@ fun MainScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.weight(0.5f))
+            Spacer(Modifier.weight(0.9f))
 
             SeekBarControl(
                 controller = controller,
@@ -281,7 +281,7 @@ fun MainScreen(
                 onPlayPauseClick = viewModel::onPlayPauseClicked
             )
 
-            Spacer(Modifier.weight(0.8f).heightIn(min = 16.dp))
+            Spacer(Modifier.weight(0.5f).heightIn(min = 16.dp))
 
             PlayerBottomControls(
                 playbackSpeed = playerState.playbackSpeed,
