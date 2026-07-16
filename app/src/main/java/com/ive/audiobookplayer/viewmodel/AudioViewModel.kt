@@ -332,11 +332,13 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                     else -> null
                 }
 
+                val playbackSpeed = settingsRepository.defaultPlaybackSpeed.first()
+
                 val isFinished = isFinished(audiobook, bookmark?.toBookmarkEntry())
 
                 val startChapter = if (isFinished) 0 else (bookmark?.chapterIndex ?: 0)
                 val startPosition = if (isFinished) 0L else (bookmark?.positionMs ?: 0L)
-                val speed = if (isFinished) 1f else (bookmark?.playbackSpeed ?: 1f)
+                val speed = if (isFinished) playbackSpeed else (bookmark?.playbackSpeed ?: playbackSpeed)
 
                 controllerManager.playAudiobook(
                     audiobook,
