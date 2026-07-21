@@ -3,7 +3,7 @@ package com.ive.audiobookplayer.ui.components
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -40,7 +40,11 @@ fun CoverArt(
             .size(size)
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(enabled = enabled) { onPickCover() },
+            .combinedClickable(
+                enabled = enabled,
+                onClick = onPickCover,
+                onLongClick = onPickCover
+            ),
         contentAlignment = Alignment.Center
     ) {
         if (coverBitmap != null) {

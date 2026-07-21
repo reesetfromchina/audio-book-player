@@ -17,9 +17,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onVisibilityChangedNode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,6 +47,15 @@ fun LibraryScreen(
     val listState = rememberLazyListState()
     val context = LocalContext.current
 
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+
+    val filteredLibrary = remember(library, searchQuery) {
+        if(searchQuery.isBlank()){
+            library
+        }else{
+            library.filterByQuery(searchQuery)
+        }
+    }
 
     val resolveCover = remember(viewModel) {
         { audiobook: Audiobook -> viewModel.resolveCoverUri(audiobook) }
@@ -91,13 +105,15 @@ fun LibraryScreen(
             onSettings = { navController.navigate("settings") },
             onPickFolder = onPickFolder,
             onExportBackup = onExportBackup,
-            onImportBackup = onImportBackup
+            onImportBackup = onImportBackup,
+            onSearchQueryChange = {searchQuery = it},
+            searchQuery = searchQuery,
         )
 
         Spacer(Modifier.height(2.dp))
 
         LibraryBody(
-            library = library,
+            library = filteredLibrary,
             listState = listState,
             resolveCover = resolveCover,
             onPickFolder = onPickFolder,
@@ -129,3 +145,21 @@ fun LibrarySectionHeader(title: String, count: Int) {
     }
 }
 
+fun LibraryState.filterByQuery(query: String): LibraryState {
+    val q = query.trim()
+    if (q.isBlank()) return this
+
+    fun List<Audiobook>.matching() = filter {
+        it.title.contains(q, ignoreCase = true) ||
+                it.author?.contains(q, ignoreCase = true) == true
+    }
+
+    return copy(
+        audiobooks = audiobooks.matching(),
+        groups = groups.copy(
+            inProgress = groups.inProgress.matching(),
+            unplayed = groups.unplayed.matching(),
+            finished = groups.finished.matching()
+        )
+    )
+}

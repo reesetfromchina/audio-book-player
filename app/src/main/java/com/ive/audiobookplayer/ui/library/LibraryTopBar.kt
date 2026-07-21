@@ -1,39 +1,47 @@
 package com.ive.audiobookplayer.ui.library
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun LibraryTopBar(
     isBackgroundScanning: Boolean,
     isGridView: Boolean,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
     onRescan: () -> Unit,
     onToggleView: () -> Unit,
     onSettings: () -> Unit,
@@ -41,50 +49,103 @@ fun LibraryTopBar(
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
 ) {
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Audiobooks", style = MaterialTheme.typography.titleLarge)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (isBackgroundScanning) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        if (isSearchActive) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(modifier = Modifier.weight(1f)) {
+                    if (searchQuery.isEmpty()) {
+                        Text(
+                            "Search title or author",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        if (searchQuery.isNotEmpty()) {
+                            onSearchQueryChange("")
+                        } else {
+                            isSearchActive = false
+                        }
+                    },
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Close search",
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
-            IconButton(onClick = onRescan) { Icon(Icons.Default.Refresh, "Rescan library") }
+
+            LaunchedEffect(Unit) {
+                focusRequester.requestFocus()
+            }
+        } else {
+            Text(
+                "Audiobooks",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.width(4.dp))
+
+        if (isBackgroundScanning) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        }
+        if (!isSearchActive) {
+            IconButton(onClick = { isSearchActive = true }) {
+                Icon(Icons.Default.Search, contentDescription = "Search")
+            }
             IconButton(onClick = onToggleView) {
                 Icon(
                     if (isGridView) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
                     null
                 )
             }
-            IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Settings") }
-            IconButton(onClick = onPickFolder) { Icon(Icons.Default.FolderOpen, "Change folder") }
-            BackupMenu(onExportBackup, onImportBackup)
-        }
-    }
-}
-
-@Composable
- fun BackupMenu(onExport: () -> Unit, onImport: () -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Default.MoreVert, "More options")
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text("Export backup") },
-                onClick = { expanded = false; onExport() },
-                leadingIcon = { Icon(Icons.Default.Upload, null) }
-            )
-            DropdownMenuItem(
-                text = { Text("Import backup") },
-                onClick = { expanded = false; onImport() },
-                leadingIcon = { Icon(Icons.Default.Download, null) }
+            LibraryOverflowMenu(
+                onRescan = onRescan,
+                onSettings = onSettings,
+                onPickFolder = onPickFolder,
+                onExportBackup = onExportBackup,
+                onImportBackup = onImportBackup
             )
         }
     }

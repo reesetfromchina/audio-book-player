@@ -25,7 +25,7 @@ fun AudiobookCover(coverUri: Uri?, isFinished: Boolean) {
 
     Box(
         modifier = Modifier
-            .size(96.dp)
+            .size(74.dp)
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {

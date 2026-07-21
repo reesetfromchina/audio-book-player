@@ -6,14 +6,11 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.net.Uri
-import android.util.Log
 import android.widget.RemoteViews
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import com.ive.audiobookplayer.MainActivity
 import com.ive.audiobookplayer.R
-import java.io.File
 
 class PlayerWidget : AppWidgetProvider() {
 
@@ -45,8 +42,8 @@ class PlayerWidget : AppWidgetProvider() {
             views.setProgressBar(R.id.widget_progress, 100, progress, false)
             views.setImageViewResource(
                 R.id.widget_play_pause,
-                if (isPlaying) androidx.media3.session.R.drawable.media3_icon_pause
-                else androidx.media3.session.R.drawable.media3_icon_play
+                if (isPlaying) R.drawable.ic_widget_pause
+                else R.drawable.ic_widget_play
             )
 
             if (coverPath != null) {
