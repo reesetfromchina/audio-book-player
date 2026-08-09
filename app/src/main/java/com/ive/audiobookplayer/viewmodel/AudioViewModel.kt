@@ -575,6 +575,21 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         _libraryState.update { it.copy(isGridView = !it.isGridView) }
     }
 
+    fun updateAudiobookMetadata(audiobookId: String, title: String, author: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            libraryRepository.updateAudiobookMetadata(audiobookId, title, author)
+        }
+        val current = _playerState.value.currentAudiobook
+        if (current?.id == audiobookId) {
+            _playerState.update {
+                it.copy(
+                    currentAudiobook = current.copy(title = title, author = author),
+                    currentBookTitle = title
+                )
+            }
+        }
+    }
+
     fun markAsFinished(audiobook: Audiobook) {
         viewModelScope.launch(Dispatchers.IO) {
             val lastChapter = audiobook.chapters.last()

@@ -27,25 +27,25 @@ fun LibraryOverflowMenu(
     onPickFolder: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
-){
+) {
     var expanded by remember { mutableStateOf(false) }
 
 
-    Box{
-        IconButton(onClick = {expanded = true}) {
+    Box {
+        IconButton(onClick = { expanded = true }) {
             Icon(Icons.Default.MoreVert, contentDescription = "More options")
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = {expanded = false}) {
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text("Rescan library") },
-                onClick = {expanded = false; onRescan()},
-                leadingIcon = {Icon(Icons.Default.Refresh, null)}
+                onClick = { expanded = false; onRescan() },
+                leadingIcon = { Icon(Icons.Default.Refresh, null) }
             )
 
             DropdownMenuItem(
                 text = { Text("Change folder") },
-                onClick = {expanded = false; onPickFolder()},
-                leadingIcon = {Icon(Icons.Default.FolderOpen, null)}
+                onClick = { expanded = false; onPickFolder() },
+                leadingIcon = { Icon(Icons.Default.FolderOpen, null) }
             )
             HorizontalDivider()
             HorizontalDivider()

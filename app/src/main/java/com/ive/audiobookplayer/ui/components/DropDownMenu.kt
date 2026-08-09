@@ -1,10 +1,13 @@
 package com.ive.audiobookplayer.ui.components
 
 import android.net.Uri
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,6 +17,7 @@ import androidx.compose.runtime.setValue
 import com.ive.audiobookplayer.model.Audiobook
 import com.ive.audiobookplayer.model.BookmarkEntry
 import com.ive.audiobookplayer.ui.library.AudiobookInfoSheet
+import com.ive.audiobookplayer.ui.library.EditBookDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,12 +29,23 @@ fun DropdownMenuComponent(
     onFinishedProgress: () -> Unit,
     coverUri: Uri?,
     onViewNotes: () -> Unit,
+    onEditBook: (String, String) -> Unit,
 ) {
     var showBottomSheet by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
     DropdownMenu(
         expanded = showMenu,
         onDismissRequest = onDismissRequest
     ) {
+        DropdownMenuItem(
+            text = { Text("Edit info") },
+            onClick = {
+                showEditDialog = true
+                onDismissRequest()
+            },
+            leadingIcon = { Icon(Icons.Default.Edit, null) }
+        )
+        HorizontalDivider()
         DropdownMenuItem(
             text = { Text("Reset progress") },
             onClick = {
@@ -70,6 +85,17 @@ fun DropdownMenuComponent(
             bookmarkEntry = bookmarkEntry,
             overrideCoverUri = coverUri,
             onDismiss = { showBottomSheet = false }
+        )
+    }
+    if (showEditDialog) {
+        EditBookDialog(
+            initialTitle = audiobook.title,
+            initialAuthor = audiobook.author,
+            onDismiss = { showEditDialog = false },
+            onSave = { title, author ->
+                showEditDialog = false
+                onEditBook(title, author)
+            }
         )
     }
 

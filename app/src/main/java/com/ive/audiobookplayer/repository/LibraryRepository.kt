@@ -23,6 +23,7 @@ class LibraryRepository(context: Context) {
             AudiobookEntity(
                 id = audiobook.id,
                 title = audiobook.title,
+                author = audiobook.author,
                 coverUri = audiobook.coverUri
             )
         )
@@ -42,6 +43,8 @@ class LibraryRepository(context: Context) {
     }
 
     suspend fun deleteAudiobook(id: String) = audiobookDao.deleteAudiobook(id)
+    suspend fun updateAudiobookMetadata(id: String, title: String, author: String) =
+        audiobookDao.updateAudiobookMetadata(id, title, author)
     suspend fun markAsNotNew(id: String) = audiobookDao.markAsNotNew(id)
     suspend fun getAllAudiobookEntities(): List<AudiobookEntity> = audiobookDao.getAllAudiobooksList()
     suspend fun updateChapterDuration(audiobookId: String, chapterIndex: Int, durationMS : Long){

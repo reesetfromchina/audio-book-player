@@ -44,6 +44,7 @@ fun AudiobookCard(
     onResetProgress: () -> Unit,
     onFinishedAudiobook: () -> Unit,
     onViewNote: () -> Unit,
+    onEditBook: (String, String) -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
 
@@ -99,6 +100,16 @@ fun AudiobookCard(
                         )
                     }
 
+                    if (audiobook.author.isNotBlank()) {
+                        Text(
+                            audiobook.author,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
                     if (bookmark != null) {
                         Spacer(Modifier.height(4.dp))
                         AudiobookProgressRow(bookmark, progress, isFinished)
@@ -115,6 +126,7 @@ fun AudiobookCard(
             onFinishedProgress = onFinishedAudiobook,
             coverUri = coverUri,
             onViewNotes = onViewNote,
+            onEditBook = onEditBook,
         )
 
     }

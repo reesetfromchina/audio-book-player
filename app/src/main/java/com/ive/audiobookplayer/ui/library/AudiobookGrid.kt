@@ -23,6 +23,7 @@ fun AudiobookGrid(
     onResetProgress: (Audiobook) -> Unit,
     onFinishedAudiobook: (Audiobook) -> Unit,
     onViewNotes: (Audiobook) -> Unit,
+    onEditBook: (Audiobook, String, String) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
 
@@ -42,7 +43,8 @@ fun AudiobookGrid(
                 onClick = { onAudiobookSelected(book) },
                 onResetProgress = { onResetProgress(book) },
                 onFinishedAudiobook = { onFinishedAudiobook(book) },
-                onViewNotes = { onViewNotes(book) }
+                onViewNotes = { onViewNotes(book) },
+                onEditBook = { title, author -> onEditBook(book, title, author) }
             )
         }
     }

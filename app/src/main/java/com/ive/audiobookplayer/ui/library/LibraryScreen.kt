@@ -66,7 +66,10 @@ fun LibraryScreen(
             onAudiobookSelected = onAudiobookSelected,
             onResetProgress = { viewModel.resetProgress(it) },
             onFinishedAudiobook = { viewModel.markAsFinished(it) },
-            onViewNotes = { navController.navigate("notes/${it.id}") }
+            onViewNotes = { navController.navigate("notes/${it.id}") },
+            onEditBook = { book, title, author ->
+                viewModel.updateAudiobookMetadata(book.id, title, author)
+            }
         )
     }
     LaunchedEffect(Unit) {

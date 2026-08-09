@@ -55,6 +55,7 @@ fun AudiobookGridCard(
     onResetProgress: () -> Unit,
     onFinishedAudiobook: () -> Unit,
     onViewNotes: () -> Unit,
+    onEditBook: (String, String) -> Unit,
 ) {
     val progress = remember(audiobook.id, bookmark?.positionMs, bookmark?.chapterIndex) {
         calculateProgress(audiobook, bookmark)
@@ -206,6 +207,7 @@ fun AudiobookGridCard(
                 onFinishedProgress = onFinishedAudiobook,
                 coverUri = coverUri,
                 onViewNotes = onViewNotes,
+                onEditBook = onEditBook,
             )
 
         }

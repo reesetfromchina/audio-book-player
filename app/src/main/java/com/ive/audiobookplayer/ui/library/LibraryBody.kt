@@ -89,6 +89,7 @@ private fun LibraryGridBody(
         onResetProgress = actions.onResetProgress,
         onFinishedAudiobook = actions.onFinishedAudiobook,
         onViewNotes = actions.onViewNotes,
+        onEditBook = actions.onEditBook,
     )
 }
 
@@ -151,7 +152,8 @@ private fun LazyListScope.librarySection(
             onClick = { actions.onAudiobookSelected(book) },
             onResetProgress = { actions.onResetProgress(book) },
             onFinishedAudiobook = { actions.onFinishedAudiobook(book) },
-            onViewNote = { actions.onViewNotes(book) }
+            onViewNote = { actions.onViewNotes(book) },
+            onEditBook = { title, author -> actions.onEditBook(book, title, author) }
         )
     }
     item(key = "spacer_$key") {

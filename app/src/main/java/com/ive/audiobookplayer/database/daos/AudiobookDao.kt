@@ -35,6 +35,9 @@ interface AudiobookDao{
     @Query("UPDATE audiobooks SET isNew = 0 where id = :id")
     suspend fun markAsNotNew(id: String)
 
+    @Query("UPDATE audiobooks SET title = :title, author = :author WHERE id = :id")
+    suspend fun updateAudiobookMetadata(id: String, title: String, author: String)
+
     @Query("SELECT * FROM audiobooks")
     suspend fun getAllAudiobooksList() : List<AudiobookEntity>
 

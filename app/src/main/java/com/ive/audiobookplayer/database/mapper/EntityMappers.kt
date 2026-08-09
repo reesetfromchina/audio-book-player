@@ -11,6 +11,7 @@ fun AudiobookWithChapters.toAudiobook(): Audiobook {
     return Audiobook(
         id = audiobook.id,
         title = audiobook.title,
+        author = audiobook.author,
         coverUri = audiobook.coverUri,
         chapters = chapters
             .sortedBy { it.index }

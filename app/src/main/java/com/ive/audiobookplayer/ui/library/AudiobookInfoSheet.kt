@@ -106,6 +106,15 @@ fun AudiobookInfoSheet(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (audiobook.author.isNotBlank()) {
+                        Text(
+                            text = audiobook.author,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                     Text(
                         text = "${audiobook.chapters.size} Chapters",
                         style = MaterialTheme.typography.bodyMedium,

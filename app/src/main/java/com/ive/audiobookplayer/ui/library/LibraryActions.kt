@@ -7,4 +7,5 @@ data class LibraryActions(
     val onResetProgress: (Audiobook) -> Unit,
     val onFinishedAudiobook: (Audiobook) -> Unit,
     val onViewNotes: (Audiobook) -> Unit,
+    val onEditBook: (Audiobook, String, String) -> Unit,
 )
