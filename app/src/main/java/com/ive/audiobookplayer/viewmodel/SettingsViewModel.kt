@@ -1,11 +1,14 @@
 package com.ive.audiobookplayer.viewmodel
 
 import android.app.Application
+import androidx.annotation.OptIn
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.util.UnstableApi
 import com.ive.audiobookplayer.model.SettingsState
 import com.ive.audiobookplayer.repository.SettingsRepository
 import com.ive.audiobookplayer.repository.ThemeMode
+import com.ive.audiobookplayer.service.VolumeBoostAudioProcessor
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -25,6 +28,7 @@ class SettingsViewModel(
         settingsRepository.finishThresholdPercent,
         settingsRepository.themeMode,
         settingsRepository.autoRescanOnOpen,
+        settingsRepository.volumeBoost,
     ){
         values ->
         SettingsState(
@@ -35,6 +39,7 @@ class SettingsViewModel(
             finishThresholdPercent = values[4] as Int,
             themeMode = values[5] as ThemeMode,
             autoRescanOnOpen = values[6] as Boolean,
+            volumeBoost = values[7] as Float,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsState())
 
@@ -59,5 +64,11 @@ class SettingsViewModel(
     }
     fun setAutoRescanOnOpen(enabled: Boolean) = viewModelScope.launch {
         settingsRepository.setAutoRescanOnOpen(enabled)
+    }
+
+    @OptIn(UnstableApi::class)
+    fun setVolumeBoost(boost: Float) = viewModelScope.launch {
+        settingsRepository.setVolumeBoost(boost)
+        VolumeBoostAudioProcessor.setGain(boost)
     }
 }

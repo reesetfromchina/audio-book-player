@@ -27,6 +27,7 @@ class SettingsRepository(private val context: Context) {
     private val AUTO_RESCAN_ON_OPEN_KEY = booleanPreferencesKey("auto_rescan_op_open")
     private val AUTO_REWIND_SECONDS_KEY = intPreferencesKey("auto_rewind_seconds")
     private val FINISH_THRESHOLD_PERCENT_KEY = intPreferencesKey("finish_threshold_percent")
+    private val VOLUME_BOOST_KEY = floatPreferencesKey("volume_boost")
 
     val rootFolderUri: Flow<String?> = context.settingsDataStore.data.map { prefs ->
         prefs[ROOT_FOLDER_URI_KEY]
@@ -90,6 +91,13 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setFinishThresholdPercent(percent : Int){
         context.settingsDataStore.edit { it[FINISH_THRESHOLD_PERCENT_KEY] = percent }
+    }
+
+    val volumeBoost: Flow<Float> =
+        context.settingsDataStore.data.map { it[VOLUME_BOOST_KEY] ?: 1f }
+
+    suspend fun setVolumeBoost(boost: Float) {
+        context.settingsDataStore.edit { it[VOLUME_BOOST_KEY] = boost }
     }
 
 

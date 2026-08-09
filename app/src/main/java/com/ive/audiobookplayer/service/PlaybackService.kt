@@ -3,6 +3,7 @@ package com.ive.audiobookplayer.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.media3.common.AudioAttributes
@@ -10,7 +11,10 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -19,6 +23,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.ive.audiobookplayer.MainActivity
 import com.ive.audiobookplayer.R
 import com.ive.audiobookplayer.repository.BookmarkRepository
+import com.ive.audiobookplayer.repository.SettingsRepository
 import com.ive.audiobookplayer.utils.SleepTimerState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,8 +31,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 
 @UnstableApi
@@ -35,6 +42,7 @@ class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private lateinit var bookmarkRepository: BookmarkRepository
+    private lateinit var settingsRepository: SettingsRepository
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var tickerJob: Job? = null
 
@@ -42,8 +50,26 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         createNotificationChannel()
         bookmarkRepository = BookmarkRepository(this)
+        settingsRepository = SettingsRepository(this)
 
-        val player = ExoPlayer.Builder(this)
+        val initialBoost = runBlocking { settingsRepository.volumeBoost.first() }
+        VolumeBoostAudioProcessor.setGain(initialBoost)
+
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioOutputPlaybackParameters: Boolean
+            ): AudioSink {
+                return DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParameters)
+                    .setAudioProcessors(arrayOf(VolumeBoostAudioProcessor))
+                    .build()
+            }
+        }
+
+        val player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)

@@ -40,6 +40,7 @@ fun SettingsScreen(
     var showDefaultSpeedDialog by remember { mutableStateOf(false) }
     var showAutoRewindDialog by remember { mutableStateOf(false) }
     var showFinishThresholdDialog by remember { mutableStateOf(false) }
+    var showVolumeBoostDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -88,6 +89,12 @@ fun SettingsScreen(
                     label = "Auto rewind on resume",
                     value = if (state.autoRewindSeconds == 0) "Off" else "${state.autoRewindSeconds}s",
                     onClick = {showAutoRewindDialog = true}
+                )
+
+                SettingsRow(
+                    label = "Volume boost",
+                    value = formatVolumeBoost(state.volumeBoost),
+                    onClick = {showVolumeBoostDialog = true}
                 )
             }
 
@@ -157,6 +164,13 @@ fun SettingsScreen(
             optionLabel = { "$it%" },
             onSelect = { settingsViewModel.setFinishThresholdPercent(it) },
             onDismiss = { showFinishThresholdDialog = false }
+        )
+    }
+    if (showVolumeBoostDialog) {
+        VolumeBoostDialog(
+            current = state.volumeBoost,
+            onSelect = { settingsViewModel.setVolumeBoost(it) },
+            onDismiss = { showVolumeBoostDialog = false }
         )
     }
 }
