@@ -159,6 +159,15 @@ fun AudiobookGridCard(
                         lineHeight = 18.sp
                     )
 
+                    Text(
+                        audiobook.author,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        minLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
